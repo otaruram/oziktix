@@ -1,7 +1,7 @@
 {
   "buildCommand": "cd fe && npm run build",
   "outputDirectory": "fe/dist",
-  "installCommand": "cd fe && npm install --include=optional",
+  "installCommand": "cd fe && npm install --no-package-lock && npm install --no-save @rollup/rollup-linux-x64-gnu",
   "framework": "vite",
   "rewrites": [
     {

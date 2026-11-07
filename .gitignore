@@ -19,6 +19,9 @@ fe/dist/
 be/dist/
 
 # Environment and sensitive keys
+package-lock.json
+fe/package-lock.json
+be/package-lock.json
 .env
 .env.*
 !.env.example
