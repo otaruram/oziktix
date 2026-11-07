@@ -20,8 +20,9 @@ const getEnvVar = (viteKey: string, nextKey: string, fallback: string): string =
     const val = String((import.meta as any).env[viteKey]);
     return sanitizeEnvVal(val, fallback);
   }
-  if (typeof process !== 'undefined' && process.env?.[nextKey]) {
-    const val = String(process.env[nextKey]);
+  const proc = (globalThis as any).process;
+  if (proc?.env?.[nextKey]) {
+    const val = String(proc.env[nextKey]);
     return sanitizeEnvVal(val, fallback);
   }
   return fallback;
