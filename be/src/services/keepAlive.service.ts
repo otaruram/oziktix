@@ -1,10 +1,11 @@
 import { prisma } from '../infrastructure/db/prisma';
+import { ShowcaseSeederService } from './showcaseSeeder.service';
 
 export class KeepAliveService {
   private static timer: NodeJS.Timeout | null = null;
 
   /**
-   * Pings Supabase PostgreSQL and measures roundtrip latency.
+   * Pings Supabase PostgreSQL, ensures baseline showcase telemetry is active, and measures roundtrip latency.
    */
   public static async pingDatabase(): Promise<{
     status: string;
@@ -14,6 +15,7 @@ export class KeepAliveService {
     timestamp: string;
   }> {
     const start = Date.now();
+    await ShowcaseSeederService.ensureSeeded();
     const count = await prisma.seat.count();
     const latency = Date.now() - start;
 
@@ -27,25 +29,25 @@ export class KeepAliveService {
   }
 
   /**
-   * Starts periodic database keep-alive ping to prevent Supabase Free Tier from sleeping/pausing.
-   * Default interval: 10 minutes (600,000 ms).
+   * Starts periodic database keep-alive ping to prevent Supabase Free Tier & Render from sleeping/pausing.
+   * Default interval: 5 minutes (300,000 ms).
    */
-  public static startScheduler(intervalMs = 10 * 60 * 1000) {
+  public static startScheduler(intervalMs = 5 * 60 * 1000) {
     if (this.timer) {
       clearInterval(this.timer);
     }
 
-    console.log(`[KeepAlive] ⏱️ Supabase Free Tier Keep-Alive scheduled every ${intervalMs / 60000} minutes.`);
+    console.log(`[KeepAlive] ⏱️ Supabase & Render Keep-Alive scheduled every ${intervalMs / 60000} minutes.`);
 
-    // Perform initial ping after 5 seconds
+    // Perform initial ping & showcase seed after 2 seconds
     setTimeout(async () => {
       try {
         const res = await this.pingDatabase();
-        console.log(`[KeepAlive] 🟢 Initial Supabase ping OK (${res.latencyMs}ms, ${res.seatCount} seats)`);
+        console.log(`[KeepAlive] 🟢 Initial Supabase ping & showcase seed OK (${res.latencyMs}ms, ${res.seatCount} seats)`);
       } catch (err: any) {
         console.warn(`[KeepAlive] ⚠️ Initial Supabase ping error:`, err?.message || err);
       }
-    }, 5000);
+    }, 2000);
 
     // Recurring interval
     this.timer = setInterval(async () => {

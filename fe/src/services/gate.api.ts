@@ -47,7 +47,13 @@ export const GateApi = {
   async scanTicket(
     payload: string,
     currentTimestamp: number = Date.now(),
-    extra?: { ticketId?: string; signature?: string; timeWindow?: number; directIdentityVerify?: boolean }
+    extra?: {
+      ticketId?: string;
+      signature?: string;
+      timeWindow?: number;
+      directIdentityVerify?: boolean;
+      simulateScenario?: 'VALID_GREEN' | 'ANTI_PASSBACK_YELLOW' | 'INVALID_RED';
+    }
   ): Promise<GateScanResult> {
     try {
       const response = await axiosInstance.post<GateScanResult>('/api/v1/gate/scan', {

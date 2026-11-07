@@ -2,8 +2,8 @@ name: Keep-Alive Supabase & Render
 
 on:
   schedule:
-    # Run every 6 hours (Supabase pauses after 7 days of inactivity; this keeps it awake forever)
-    - cron: '0 */6 * * *'
+    # Run every 15 minutes during competition evaluation window to keep both Render & Supabase warm 24/7
+    - cron: '*/15 * * * *'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:

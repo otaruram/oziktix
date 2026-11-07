@@ -3,6 +3,7 @@ import { AuthenticatedUser } from '../domain/types';
 import { ConflictError, QuotaExceededError, NotFoundError, BadRequestError } from '../domain/errors';
 import { StatefulEngine } from '../infrastructure/crypto/statefulEngine';
 import { Seat, SeatStatus, Ticket, TicketStatus } from '@prisma/client';
+import { ShowcaseSeederService } from './showcaseSeeder.service';
 
 interface CanonicalSeatTemplate {
   id: string;
@@ -87,6 +88,7 @@ export class SeatService {
     }
 
     if (isAdminScope) {
+      await ShowcaseSeederService.ensureSeeded();
       // Admin sees EVERY user's bookings & active holds across the whole database
       const [allTickets, allHolds] = await Promise.all([
         prisma.$queryRaw<any[]>`
@@ -207,7 +209,9 @@ export class SeatService {
   }
 
   public async getSummary(user?: AuthenticatedUser): Promise<{ total: number; available: number; sold: number; held: number }> {
-    const seats = await this.getSeatsForUser(user);
+    await ShowcaseSeederService.ensureSeeded();
+    const scope = !user || user.role === 'ADMIN' ? 'admin' : undefined;
+    const seats = await this.getSeatsForUser(user, scope);
     let sold = 0;
     let held = 0;
     let available = 0;

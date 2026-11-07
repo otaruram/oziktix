@@ -62,42 +62,69 @@ export const CameraScannerMock: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Execute real scan against PostgreSQL GateLog & Ticket table
-  const handleScanSelectedTicket = async (mode: 'LIVE_VALID' | 'EXPIRED_SCREENSHOT' | 'FORGED_SIGNATURE' = 'LIVE_VALID') => {
-    if (!selectedTicket) return;
+  // Execute real scan against PostgreSQL GateLog & Ticket table (supports 1-click deterministic judge simulation)
+  const handleScanSelectedTicket = async (
+    mode:
+      | 'LIVE_VALID'
+      | 'SIMULATE_GREEN_VALID'
+      | 'SIMULATE_YELLOW_PASSBACK'
+      | 'EXPIRED_SCREENSHOT'
+      | 'FORGED_SIGNATURE' = 'LIVE_VALID'
+  ) => {
+    const target = selectedTicket || universalTickets[0];
+    const targetTicketId = target?.id || 'tix_showcase_02';
+    const targetSeatId = target?.seatId || 'VIP-A02';
+    const targetUserName = target?.userName || 'Nadia Kusuma Wardhani';
+    const targetUserId = target?.userId || 'usr_sim_02';
+
     setIsLoading(true);
     try {
-      let payloadStr = selectedTicket.rawQrPayload;
+      let payloadStr =
+        target?.rawQrPayload ||
+        JSON.stringify({
+          app: 'OZIKTIX',
+          tid: targetTicketId,
+          seat: targetSeatId,
+          uid: targetUserId,
+          tw: Math.floor(Date.now() / 30000),
+          v: '2026.1',
+        });
+
       let extra: any = {
-        ticketId: selectedTicket.id,
-        signature: selectedTicket.digitalSignature,
-        timeWindow: selectedTicket.timeWindow,
-        directIdentityVerify: mode === 'LIVE_VALID',
+        ticketId: targetTicketId,
+        signature: target?.digitalSignature || '',
+        timeWindow: target?.timeWindow || Math.floor(Date.now() / 30000),
+        directIdentityVerify: mode === 'LIVE_VALID' || mode === 'SIMULATE_GREEN_VALID' || mode === 'SIMULATE_YELLOW_PASSBACK',
       };
 
-      if (mode === 'EXPIRED_SCREENSHOT') {
+      if (mode === 'SIMULATE_GREEN_VALID') {
+        extra.simulateScenario = 'VALID_GREEN';
+      } else if (mode === 'SIMULATE_YELLOW_PASSBACK') {
+        extra.simulateScenario = 'ANTI_PASSBACK_YELLOW';
+      } else if (mode === 'EXPIRED_SCREENSHOT') {
         const oldTw = Math.floor(Date.now() / 30000) - 25;
         payloadStr = JSON.stringify({
           app: 'OZIKTIX',
-          tid: selectedTicket.id,
-          seat: selectedTicket.seatId,
-          uid: selectedTicket.userId,
+          tid: targetTicketId,
+          seat: targetSeatId,
+          uid: targetUserId,
           tw: oldTw,
           totp: '000999',
           sig: 'expired_screenshot_signature_000',
           v: '2026.1',
         });
         extra = {
-          ticketId: selectedTicket.id,
+          ticketId: targetTicketId,
           signature: 'expired_screenshot_signature_000',
           timeWindow: oldTw,
           directIdentityVerify: false,
+          simulateScenario: 'INVALID_RED',
         };
       } else if (mode === 'FORGED_SIGNATURE') {
         payloadStr = JSON.stringify({
           app: 'OZIKTIX',
           tid: 'TIX-PALSU-9999',
-          seat: selectedTicket.seatId,
+          seat: targetSeatId,
           uid: 'scalper_forged',
           tw: Math.floor(Date.now() / 30000),
           totp: '000000',
@@ -109,6 +136,7 @@ export const CameraScannerMock: React.FC = () => {
           signature: 'forged_invalid_hmac_signature',
           timeWindow: Math.floor(Date.now() / 30000),
           directIdentityVerify: false,
+          simulateScenario: 'INVALID_RED',
         };
       }
 
@@ -126,20 +154,20 @@ export const CameraScannerMock: React.FC = () => {
       if (res.verdict === 'VALID') {
         addToast(
           'success',
-          '✅ Scan Gate VALID — Akses Diberikan!',
-          `${selectedTicket.userName} (Kursi ${selectedTicket.seatId}) berhasil check-in & tercatat di Admin GateLog.`
+          '🟢 TIER-1 HIJAU: VALID — Akses Diberikan!',
+          `${targetUserName} (Kursi ${targetSeatId}) berhasil check-in & tercatat di Admin GateLog.`
         );
       } else if (res.verdict === 'ALREADY_USED') {
         addToast(
           'warning',
-          '⚠️ Anti-Passback: Tiket Sudah Digunakan!',
+          '🟡 TIER-2 KUNING: Anti-Passback — Tiket Sudah Dipakai!',
           res.message || 'Tiket ini sudah pernah di-scan masuk sebelumnya.'
         );
       } else {
         addToast(
           'error',
-          '❌ Scan Ditolak (INVALID)',
-          res.message || 'Tanda tangan digital tidak valid atau tiket telah di-refund.'
+          '🔴 TIER-3 MERAH: TIDAK VALID — Akses Ditolak!',
+          res.message || 'Tanda tangan digital tidak valid, screenshot TOTP kedaluwarsa, atau tiket palsu.'
         );
       }
 
@@ -161,11 +189,11 @@ export const CameraScannerMock: React.FC = () => {
               Universal Gate Scanner (Identitas & TTD Digital)
             </h2>
             <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-400 text-[10px] font-mono font-bold">
-              UNIVERSAL ALL-USERS REGISTRY • Petugas: {currentUser?.name}
+              TANPA KAMERA FISIK READY • Petugas: {currentUser?.name}
             </span>
           </div>
           <p className="text-xs text-slate-400">
-            Cari pengunjung dari seluruh akun berdasarkan **Nama, NIK KTP, Email, Kursi, atau Tanda Tangan Digital (HMAC-SHA256)** → Klik untuk rincian → Scan Validasi Masuk Gate!
+            Gunakan **Tombol Simulasi 1-Klik** di bawah untuk menguji 3 layar respons Gate (**Hijau / Kuning Anti-Passback / Merah**) dalam 1 detik langsung dari laptop atau HP tanpa perlu kamera fisik!
           </p>
         </div>
 
@@ -176,6 +204,126 @@ export const CameraScannerMock: React.FC = () => {
           <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-amber-400' : ''}`} />
           <span>Sync Universal Tiket ({universalTickets.length})</span>
         </button>
+      </div>
+
+      {/* =================================================================== */}
+      {/* 1-CLICK JUDGE SIMULATION BAR (NO PHYSICAL CAMERA REQUIRED!)         */}
+      {/* =================================================================== */}
+      <div className="p-5 rounded-3xl bg-[#0b0f19] border-2 border-emerald-500/40 shadow-xl space-y-4 font-mono">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-wide">
+              ⚡ Simulasi Cepat Juri (1-Klik Tanpa Kamera Fisik — Bukti Anti-Passback 1 Detik)
+            </span>
+          </div>
+          <span className="text-[11px] text-emerald-400 font-semibold">
+            Target Aktif: {selectedTicket ? `${selectedTicket.userName} (${selectedTicket.seatId})` : 'Otomatis (VIP-A02)'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Button 1: Green VALID */}
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => handleScanSelectedTicket('SIMULATE_GREEN_VALID')}
+            className="p-4 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border-2 border-emerald-400 text-left transition-all flex flex-col justify-between gap-2 group active:scale-[0.99] disabled:opacity-50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-extrabold text-[10px] uppercase">
+                TIER 1 • LAYAR HIJAU
+              </span>
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <div className="text-sm font-extrabold text-emerald-400">
+                1. Uji Scan VALID (Hijau)
+              </div>
+              <p className="text-[11px] text-slate-300 font-sans mt-0.5 leading-snug">
+                Verifikasi HMAC-SHA256 & TOTP 30 detik cocok → Pintu Gate terbuka & status menjadi CHECKED_IN.
+              </p>
+            </div>
+          </button>
+
+          {/* Button 2: Yellow ALREADY_USED (Anti-Passback) */}
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => handleScanSelectedTicket('SIMULATE_YELLOW_PASSBACK')}
+            className="p-4 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 border-2 border-amber-400 text-left transition-all flex flex-col justify-between gap-2 group active:scale-[0.99] disabled:opacity-50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold text-[10px] uppercase">
+                TIER 2 • LAYAR KUNING
+              </span>
+              <AlertTriangle className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <div className="text-sm font-extrabold text-amber-400">
+                2. Uji Sudah Dipakai (Kuning)
+              </div>
+              <p className="text-[11px] text-slate-300 font-sans mt-0.5 leading-snug">
+                Buktikan proteksi <strong>Anti-Passback</strong>: Tiket yang sudah masuk ditolak jika di-scan ulang!
+              </p>
+            </div>
+          </button>
+
+          {/* Button 3: Red INVALID (Expired Screenshot / Counterfeit) */}
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => handleScanSelectedTicket('EXPIRED_SCREENSHOT')}
+            className="p-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border-2 border-rose-500 text-left transition-all flex flex-col justify-between gap-2 group active:scale-[0.99] disabled:opacity-50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white always-white font-extrabold text-[10px] uppercase">
+                TIER 3 • LAYAR MERAH
+              </span>
+              <XCircle className="w-5 h-5 text-rose-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <div className="text-sm font-extrabold text-rose-400">
+                3. Uji Tidak Valid / Palsu (Merah)
+              </div>
+              <p className="text-[11px] text-slate-300 font-sans mt-0.5 leading-snug">
+                Simulasikan screenshot QR lama (&gt;30 detik) atau tanda tangan palsu calo → Ditolak total!
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Immediate Giant 3-Tier Screen Output Right Inside the Simulator Bar */}
+        {scanResult && (
+          <div
+            className={`p-5 rounded-2xl border-2 space-y-2 animate-in fade-in zoom-in-95 duration-150 ${
+              scanResult.verdict === 'VALID'
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                : scanResult.verdict === 'ALREADY_USED'
+                ? 'bg-amber-500/20 border-amber-400 text-amber-400'
+                : 'bg-rose-500/20 border-rose-500 text-rose-400'
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 font-extrabold text-base sm:text-lg uppercase">
+                {scanResult.verdict === 'VALID' && <CheckCircle2 className="w-6 h-6 shrink-0" />}
+                {scanResult.verdict === 'ALREADY_USED' && <AlertTriangle className="w-6 h-6 shrink-0" />}
+                {scanResult.verdict === 'INVALID' && <XCircle className="w-6 h-6 shrink-0" />}
+                <span>
+                  {scanResult.verdict === 'VALID'
+                    ? '🟢 LAYAR HIJAU: AKSES DIBERIKAN (VALID)'
+                    : scanResult.verdict === 'ALREADY_USED'
+                    ? '🟡 LAYAR KUNING: SUDAH DIPAKAI (ANTI-PASSBACK ALERT)'
+                    : '🔴 LAYAR MERAH: TIDAK VALID / AKSES DITOLAK'}
+                </span>
+              </div>
+              <span className="text-[11px] px-2.5 py-1 rounded-lg bg-black/40 border border-white/[0.15] text-white">
+                Tercatat di PostgreSQL GateLog • {new Date().toLocaleTimeString('id-ID')}
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-white font-semibold font-sans">{scanResult.message}</p>
+          </div>
+        )}
       </div>
 
       {/* Universal Search Bar */}

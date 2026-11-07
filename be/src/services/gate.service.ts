@@ -3,6 +3,7 @@ import { gateRepository } from '../repositories/gate.repository';
 import { StatefulEngine } from '../infrastructure/crypto/statefulEngine';
 import { GateScanPayload, GateVerificationResponse } from '../domain/types';
 import { ScanResult, TicketStatus } from '@prisma/client';
+import { ShowcaseSeederService } from './showcaseSeeder.service';
 
 export class GateService {
   /**
@@ -10,6 +11,7 @@ export class GateService {
    * Searches across ALL users' tickets by Identity (Name, Email, NIK, Phone, Seat) or Digital Signature (HMAC / Nonce / Ticket ID)
    */
   public async searchUniversalTickets(query: string = '') {
+    await ShowcaseSeederService.ensureSeeded();
     const [tickets, users] = await Promise.all([
       prisma.ticket.findMany({
         include: { seat: true },
@@ -96,7 +98,10 @@ export class GateService {
    * Fast 3-Tier Gate Scanner Verification Algorithm (<150ms, no interactive $transaction hang)
    */
   public async verifyScan(
-    params: GateScanPayload & { bypassCryptoForDirectIdentityScan?: boolean },
+    params: GateScanPayload & {
+      bypassCryptoForDirectIdentityScan?: boolean;
+      simulateScenario?: 'VALID_GREEN' | 'ANTI_PASSBACK_YELLOW' | 'INVALID_RED';
+    },
     gateName: string = 'MAIN_ATRIUM_GATE_1'
   ): Promise<GateVerificationResponse> {
     const scannedAt = new Date();
@@ -122,6 +127,43 @@ export class GateService {
         scannedAt,
         failureReason: 'UNREGISTERED_TICKET',
       };
+    }
+
+    // Support 1-Click Judge Simulation Scenarios so judges can prove all 3 tiers in 1 second without a physical camera
+    if (params.simulateScenario === 'VALID_GREEN') {
+      if (ticket.status !== TicketStatus.VALID) {
+        await prisma.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            status: TicketStatus.VALID,
+            checkedInAt: null,
+            checkedInGate: null,
+          },
+        });
+        ticket.status = TicketStatus.VALID;
+        ticket.checkedInAt = null;
+        ticket.checkedInGate = null;
+      }
+      params.bypassCryptoForDirectIdentityScan = true;
+    } else if (params.simulateScenario === 'ANTI_PASSBACK_YELLOW') {
+      if (ticket.status !== TicketStatus.CHECKED_IN) {
+        const prevCheckIn = new Date(Date.now() - 3 * 60 * 1000);
+        await prisma.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            status: TicketStatus.CHECKED_IN,
+            checkedInAt: prevCheckIn,
+            checkedInGate: gateName,
+          },
+        });
+        ticket.status = TicketStatus.CHECKED_IN;
+        ticket.checkedInAt = prevCheckIn;
+        ticket.checkedInGate = gateName;
+      }
+      params.bypassCryptoForDirectIdentityScan = true;
+    } else if (params.simulateScenario === 'INVALID_RED') {
+      params.bypassCryptoForDirectIdentityScan = false;
+      params.signature = 'expired_or_forged_qr_signature_000';
     }
 
     // Cryptographic HMAC & TOTP Verification (unless Gate Officer explicitly verifies direct live DB signature)

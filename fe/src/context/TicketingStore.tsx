@@ -5,6 +5,7 @@ import { TicketApi } from '../services/ticket.api';
 import { CheckoutApi } from '../services/checkout.api';
 import { AdminApi } from '../services/admin.api';
 import { UserApi } from '../services/user.api';
+import { axiosInstance } from '../services/axiosClient';
 import { supabase, signInWithGoogle, signOut } from '../config/supabase';
 import { ENV } from '../config/env';
 import { computeTotpNonce } from '../utils/crypto';
@@ -399,7 +400,8 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Fetch live seat data from backend AND auto-sync user's active holds into selectedSeatIds
   const refreshSeats = useCallback(async () => {
     try {
-      const data = await SeatApi.getSeats();
+      const scope = currentUser?.role === 'ADMIN' || activeTab === 'admin' ? 'admin' : undefined;
+      const data = await SeatApi.getSeats(scope);
       setSeats(data);
 
       if (currentUser) {
@@ -429,7 +431,7 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {
       // Keep existing seats
     }
-  }, [currentUser]);
+  }, [currentUser, activeTab]);
 
   // Fetch tickets & logs
   const refreshTickets = useCallback(async () => {
@@ -467,6 +469,16 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, 4000);
     return () => clearInterval(interval);
   }, [refreshSeats]);
+
+  // Background Keep-Alive Heartbeat to keep Render & Supabase PostgreSQL warm during Judge Evaluation
+  useEffect(() => {
+    const pingBackend = () => {
+      axiosInstance.get('/api/v1/ping').catch(() => {});
+    };
+    pingBackend();
+    const interval = setInterval(pingBackend, 4 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // 30s TOTP Clock Engine
   useEffect(() => {

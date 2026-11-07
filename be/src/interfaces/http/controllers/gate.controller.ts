@@ -19,7 +19,16 @@ export class GateController {
 
   public async scan(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { ticketId, timeWindow, signature, rawPayload, payload, directIdentityVerify, gateName } = req.body;
+      const {
+        ticketId,
+        timeWindow,
+        signature,
+        rawPayload,
+        payload,
+        directIdentityVerify,
+        simulateScenario,
+        gateName,
+      } = req.body;
 
       let parsedTicketId = ticketId;
       let parsedTimeWindow = timeWindow;
@@ -48,6 +57,7 @@ export class GateController {
           signature: parsedSignature || '',
           rawPayload: rawString,
           bypassCryptoForDirectIdentityScan: Boolean(directIdentityVerify),
+          simulateScenario,
         },
         gateName || 'MAIN_ATRIUM_GATE_1'
       );

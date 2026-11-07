@@ -7,9 +7,11 @@ export const SeatApi = {
    * Fetch all 60 seats for the Summarecon Mall Bandung Atrium
    * Calls GET /api/v1/seats
    */
-  async getSeats(): Promise<Seat[]> {
+  async getSeats(scope?: string): Promise<Seat[]> {
     try {
-      const response = await axiosInstance.get<ApiResponse<Seat[]> | Seat[]>('/api/v1/seats');
+      const response = await axiosInstance.get<ApiResponse<Seat[]> | Seat[]>('/api/v1/seats', {
+        params: scope ? { scope } : undefined,
+      });
       let rawList: any[] = [];
       if (Array.isArray(response.data)) {
         rawList = response.data;

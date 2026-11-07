@@ -68,8 +68,8 @@ if (require.main === module) {
     console.log(`🏛️ Venue: Summarecon Mall Bandung (Atrium Gala 2026)`);
     console.log(`====================================================`);
 
-    // Auto-start Supabase keep-alive scheduler (every 10 minutes)
-    KeepAliveService.startScheduler(10 * 60 * 1000);
+    // Auto-start Supabase keep-alive scheduler (every 5 minutes)
+    KeepAliveService.startScheduler(5 * 60 * 1000);
   });
 
   const shutdown = () => {

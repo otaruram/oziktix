@@ -3,6 +3,7 @@ import { DashboardMetrics } from '../domain/types';
 import { NotFoundError, BadRequestError } from '../domain/errors';
 import { TicketStatus } from '@prisma/client';
 import { userRepository } from '../repositories/user.repository';
+import { ShowcaseSeederService } from './showcaseSeeder.service';
 
 export class AdminService {
   /**
@@ -12,6 +13,7 @@ export class AdminService {
     const totalCapacity = 60;
 
     try {
+      await ShowcaseSeederService.ensureSeeded();
       const [activeTickets, activeHolds] = await Promise.all([
         prisma.ticket.findMany({
           where: {
@@ -54,6 +56,7 @@ export class AdminService {
 
   public async getAllAttendees() {
     try {
+      await ShowcaseSeederService.ensureSeeded();
       const [tickets, users] = await Promise.all([
         prisma.ticket.findMany({
           include: { seat: true },
