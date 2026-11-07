@@ -1,13 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { ENV, LIVE_SUPABASE_URL, LIVE_SUPABASE_ANON_KEY } from './env';
 
-const targetUrl = ENV.SUPABASE_URL && !ENV.SUPABASE_URL.includes('oziktix-challenge-2026')
-  ? ENV.SUPABASE_URL
-  : LIVE_SUPABASE_URL;
-
-const targetKey = ENV.SUPABASE_ANON_KEY && !ENV.SUPABASE_ANON_KEY.includes('dummy')
-  ? ENV.SUPABASE_ANON_KEY
-  : LIVE_SUPABASE_ANON_KEY;
+// Explicitly hardcoded to real production Supabase project (guarantees zero broken DNS or legacy dummy URLs)
+const targetUrl = LIVE_SUPABASE_URL;
+const targetKey = LIVE_SUPABASE_ANON_KEY;
 
 // Initialize Supabase client
 export const supabase = createClient(targetUrl, targetKey, {

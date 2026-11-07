@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTicketing } from '../../../context/TicketingStore';
 import { SeatApi } from '../../../services/seat.api';
+import { BrandLogo, BrandMark } from '../../common/BrandLogo';
 import {
   ShieldCheck,
   ArrowRight,
@@ -649,14 +650,10 @@ export const EventHero: React.FC = () => {
       <footer className="w-full py-12 px-4 sm:px-6 lg:px-8 border-t border-white/[0.08] bg-[#070a12]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 font-mono text-xs">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-400 flex items-center justify-center p-0.5 shrink-0">
-              <div className="w-full h-full bg-[#070a12] rounded-[10px] flex items-center justify-center">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
-            </div>
+            <BrandMark sizePx={38} />
             <div>
               <div className="font-bold text-white text-sm">
-                OzikTix — Summarecon Mall Bandung Atrium Gala 2026
+                Ozik<span className="text-emerald-400">Tix</span> — Summarecon Mall Bandung Atrium Gala 2026
               </div>
               <div className="text-[11px] text-slate-400">
                 Cryptographic HMAC-SHA256 • 30s Rotating TOTP • PostgreSQL Atomic Row Locking

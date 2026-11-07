@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTicketing } from '../../../context/TicketingStore';
+import { BrandMark } from '../../common/BrandLogo';
 import { 
   Clock, 
   ShieldCheck, 
@@ -106,7 +107,7 @@ export const CheckoutView: React.FC = () => {
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <BrandMark sizePx={20} />
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
                   Identity Binding & Anti-Scalping Hash
                 </h3>

@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useTicketing } from '../../../context/TicketingStore';
 import { Ticket, Seat } from '../../../types/ticketing';
 import { computeTotpNonce, formatQrPayload } from '../../../utils/crypto';
+import { BrandMark } from '../../common/BrandLogo';
 import {
   ShieldCheck,
   Clock,
@@ -180,9 +181,7 @@ export const TicketPassView: React.FC = () => {
             {/* Top Pass Brand Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
+                <BrandMark sizePx={32} />
                 <div>
                   <div className="text-xs font-mono font-bold text-white tracking-wide">
                     OZIKTIX PASS

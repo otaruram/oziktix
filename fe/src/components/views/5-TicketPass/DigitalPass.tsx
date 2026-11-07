@@ -4,6 +4,7 @@ import { useRotatingQr } from '../../../hooks/useRotatingQr';
 import { QrCodeRenderer } from '../../common/QrCodeRenderer';
 import { StatusBadge } from '../../common/StatusBadge';
 import { SeatSwapModal } from './SeatSwapModal';
+import { BrandMark } from '../../common/BrandLogo';
 import { Ticket } from '../../../types';
 import {
   ShieldCheck,
@@ -77,7 +78,7 @@ export const DigitalPass: React.FC = () => {
     return (
       <div className="py-20 text-center space-y-5">
         <div className="w-14 h-14 rounded-3xl bg-slate-900 border border-white/[0.08] text-slate-500 flex items-center justify-center mx-auto shadow-inner">
-          <ShieldCheck className="w-7 h-7 text-emerald-400" />
+          <BrandMark sizePx={32} />
         </div>
         <div className="space-y-1.5">
           <h3 className="text-xl font-bold text-white font-mono">No Tickets Issued Yet</h3>
@@ -165,7 +166,7 @@ export const DigitalPass: React.FC = () => {
             {/* Pass Brand Header */}
             <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <BrandMark sizePx={20} />
                 <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
                   OZIKTIX PASS CERTIFICATE
                 </span>

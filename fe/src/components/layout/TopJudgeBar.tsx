@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTicketing } from '../../context/TicketingStore';
+import { BrandLogo, BrandMark } from '../common/BrandLogo';
 import {
   ShieldCheck,
   RotateCcw,
@@ -258,14 +259,15 @@ export const TopJudgeBar: React.FC = () => {
           {/* Brand Pill */}
           <button
             onClick={() => scrollToSection('hero')}
-            className="flex items-center gap-2 pl-3 pr-3.5 h-[36px] sm:h-[38px] rounded-full font-bold text-xs sm:text-[13px] tracking-tight transition-colors shrink-0"
+            className="flex items-center gap-2 pl-2 pr-3.5 h-[36px] sm:h-[38px] rounded-full font-bold text-xs sm:text-[13px] tracking-tight transition-all shrink-0 hover:border-emerald-500/50"
             style={{
-              backgroundColor: theme === 'dark' ? '#ffffff' : '#090a0f',
-              color: theme === 'dark' ? '#000000' : '#ffffff',
+              backgroundColor: theme === 'dark' ? '#070a12' : '#ffffff',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              color: theme === 'dark' ? '#ffffff' : '#000000',
             }}
           >
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span>OzikTix</span>
+            <BrandMark sizePx={19} />
+            <span className="font-display">Ozik<span className="text-emerald-400">Tix</span></span>
           </button>
 
           {/* Smooth Section Links (Flow Cara Kerja, Protokol, Tier) */}
@@ -524,19 +526,10 @@ export const TopJudgeBar: React.FC = () => {
         {/* Brand */}
         <div
           onClick={() => setActiveTab('landing')}
-          className="flex items-center gap-2.5 cursor-pointer shrink-0"
+          className="flex items-center gap-2 cursor-pointer shrink-0"
+          title="Kembali ke Landing Page"
         >
-          <div className="w-8 h-8 rounded-xl bg-emerald-400 flex items-center justify-center p-0.5 shadow-sm">
-            <div className="w-full h-full bg-[#070a12] rounded-[10px] flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            </div>
-          </div>
-          <div className="hidden sm:block">
-            <span className="font-display font-bold text-sm tracking-tight text-white">
-              Ozik<span className="text-emerald-400">Tix</span>
-            </span>
-            <p className="text-[10px] font-mono text-slate-400">SMB Atrium Gala 2026</p>
-          </div>
+          <BrandLogo size="sm" badge="SMB '26" interactive />
         </div>
 
         {/* Core Modules Navigation (Strictly Enforced by Active Role!) */}

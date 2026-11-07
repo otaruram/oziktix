@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTicketing } from '../../../context/TicketingStore';
 import { UserRole } from '../../../types/ticketing';
+import { BrandLogo, BrandMark } from '../../common/BrandLogo';
 import {
   ShieldCheck,
   X,
@@ -184,8 +185,8 @@ export const AuthModal: React.FC = () => {
         {step === 1 && (
           <div className="space-y-6 py-2 animate-in fade-in duration-150">
             <div className="space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center mb-3">
-                <ShieldCheck className="w-6 h-6 text-emerald-400" />
+              <div className="mb-3">
+                <BrandLogo size="md" badge="SECURE AUTH" />
               </div>
               <h2 className="text-xl sm:text-2xl font-display font-extrabold text-white tracking-tight">
                 Login dengan Akun Google Resmi Anda

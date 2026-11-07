@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth, DEMO_PROFILES } from '../../../hooks/useAuth';
-import { ShieldCheck, Sparkles, UserCheck, Lock } from 'lucide-react';
+import { BrandMark } from '../../common/BrandLogo';
+import { Sparkles, UserCheck, Lock } from 'lucide-react';
 
 export const GoogleAuthCard: React.FC = () => {
   const { user, loginWithGoogle, loginAsDemoJudge, logout } = useAuth();
@@ -9,7 +10,7 @@ export const GoogleAuthCard: React.FC = () => {
     <div className="max-w-md mx-auto p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-2xl space-y-6 text-left">
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-emerald-400" />
+          <BrandMark sizePx={20} />
           <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
             Identity Gate (Google OAuth & NIK)
           </span>

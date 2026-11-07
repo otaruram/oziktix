@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTicketing } from '../../../context/TicketingStore';
+import { BrandMark } from '../../common/BrandLogo';
 import { Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Seat } from '../../../types';
 
@@ -98,7 +99,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
         <div className="p-5 rounded-2xl bg-[#0b0f19] border border-white/[0.1] space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <BrandMark sizePx={18} />
               <h3 className="text-xs font-mono font-extrabold text-white uppercase">
                 Data Identitas Pembeli (KYC Terikat)
               </h3>

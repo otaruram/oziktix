@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTicketing } from '../../../context/TicketingStore';
+import { BrandLogo, BrandMark } from '../../common/BrandLogo';
 import { 
   Calendar, 
   MapPin, 
@@ -143,13 +144,13 @@ export const LandingView: React.FC = () => {
 
       {/* Explicit System Assumptions & Timing Rules Card (Required by Brief) */}
       <div className="p-6 sm:p-8 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-          <ShieldCheck className="w-64 h-64 text-emerald-400" />
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+          <BrandMark sizePx={200} />
         </div>
 
         <div className="flex items-center gap-2.5 mb-6">
-          <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-            <ShieldCheck className="w-5 h-5" />
+          <div className="p-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+            <BrandMark sizePx={24} />
           </div>
           <div>
             <h2 className="text-lg font-bold text-white tracking-tight">
