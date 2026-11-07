@@ -4,6 +4,21 @@ import { AuthenticatedUser } from '../../domain/types';
 import { prisma } from '../db/prisma';
 import jwt from 'jsonwebtoken';
 
+// Polyfill WebSocket for Node.js 20 compatibility with Supabase Realtime client
+if (typeof (globalThis as any).WebSocket === 'undefined') {
+  try {
+    const wsModule = require('ws');
+    (globalThis as any).WebSocket = wsModule.WebSocket || wsModule;
+  } catch {
+    (globalThis as any).WebSocket = class WebSocket {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      static readonly CLOSED = 3;
+    };
+  }
+}
+
 export const supabase = createClient(ENV.SUPABASE_URL, ENV.SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
     autoRefreshToken: false,

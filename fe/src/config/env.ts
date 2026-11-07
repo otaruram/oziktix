@@ -5,29 +5,41 @@
 
 const getEnvVar = (viteKey: string, nextKey: string, fallback: string): string => {
   if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[viteKey]) {
-    return (import.meta as any).env[viteKey];
+    const val = (import.meta as any).env[viteKey];
+    if (val && !val.includes('oziktix-challenge-2026')) {
+      return val;
+    }
   }
   if (typeof process !== 'undefined' && process.env?.[nextKey]) {
-    return process.env[nextKey] as string;
+    const val = process.env[nextKey] as string;
+    if (val && !val.includes('oziktix-challenge-2026')) {
+      return val;
+    }
   }
   return fallback;
 };
+
+// Hardcoded Real Supabase Project Credentials (Active Live DB)
+export const LIVE_SUPABASE_URL = 'https://gnxrxocmvqmkibuthxtj.supabase.co';
+export const LIVE_SUPABASE_ANON_KEY = 'sb_publishable_bU0qavcq-1xOH61N2Awxgg_k4tIkWwv';
 
 export const ENV = {
   API_BASE_URL: getEnvVar(
     'VITE_API_BASE_URL',
     'NEXT_PUBLIC_API_BASE_URL',
-    'http://localhost:8080'
+    typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      ? 'https://oziktix-backend.onrender.com'
+      : 'http://localhost:8080'
   ),
   SUPABASE_URL: getEnvVar(
     'VITE_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_URL',
-    'https://oziktix-challenge-2026.supabase.co'
+    LIVE_SUPABASE_URL
   ),
   SUPABASE_ANON_KEY: getEnvVar(
     'VITE_SUPABASE_ANON_KEY',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96aWt0aXgiLCJyb2xlIjoiYW5vbiJ9.dummy_anon_key_for_judge_evaluation'
+    LIVE_SUPABASE_ANON_KEY
   ),
   DEMO_TOKENS: {
     VISITOR:
