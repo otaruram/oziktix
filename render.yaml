@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: oziktix-backend
+    env: node
+    rootDir: be
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: HMAC_SECRET
+        sync: false

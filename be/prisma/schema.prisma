@@ -1,0 +1,105 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client"
+}
+
+enum SeatStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+}
+
+enum TicketStatus {
+  VALID
+  CHECKED_IN
+  REFUNDED
+  SWAPPED_VOID
+}
+
+enum ScanResult {
+  VALID
+  ALREADY_USED
+  INVALID
+}
+
+model User {
+  id          String   @id // Supabase Auth UUID or Role ID
+  email       String   @unique
+  fullName    String
+  nik         String   @default("") // 16-digit National ID (NIK KTP)
+  phone       String   @default("")
+  avatarUrl   String?  @db.Text // Base64 uploaded photo or Google avatar URL
+  address     String?  @default("Bandung, Jawa Barat")
+  role        String   @default("VISITOR") // 'VISITOR' | 'ADMIN' | 'GATE_OFFICER'
+  kycStatus   String   @default("PENDING_SUBMISSION") // 'PENDING_SUBMISSION' | 'SUBMITTED_TO_ADMIN' | 'VERIFIED'
+  isOnboarded Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SwapLog {
+  id         String   @id @default(uuid())
+  ticketId   String
+  userId     String
+  userName   String
+  fromSeatId String
+  toSeatId   String
+  tier       String
+  reason     String
+  createdAt  DateTime @default(now())
+}
+
+model Seat {
+  id              String      @id // e.g., 'VIP-A01', 'REG-C05', 'FEST-F10'
+  rowLabel        String
+  seatNumber      Int
+  tier            String      // 'VIP' (Rp 250.000), 'REGULAR' (Rp 150.000), 'FESTIVAL' (Rp 100.000)
+  price           Int
+  status          SeatStatus  @default(AVAILABLE)
+  heldByUserId    String?     // UUID from Supabase auth.users
+  heldByUserEmail String?
+  holdExpiresAt   DateTime?   // Timestamp for 5-minute TTL
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  ticket          Ticket?
+
+  @@index([status, holdExpiresAt])
+}
+
+model Ticket {
+  id              String        @id @default(uuid())
+  seatId          String        @unique
+  seat            Seat          @relation(fields: [seatId], references: [id])
+  userId          String        // Supabase Auth UUID
+  userEmail       String
+  userName        String
+  userPhone       String
+  status          TicketStatus  @default(VALID)
+  swapCount       Int           @default(0) // Max 1 swap allowed
+  secretNonce     String        // Unique cryptographic entropy bound to this specific issuance
+  checkedInAt     DateTime?
+  checkedInGate   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  gateLogs        GateLog[]
+
+  @@index([userId, status])
+}
+
+model GateLog {
+  id              String      @id @default(uuid())
+  ticketId        String?
+  scannedPayload  String      @db.Text
+  scanResult      ScanResult
+  reason          String?
+  gateName        String      @default("MAIN_ATRIUM_GATE_1")
+  scannedAt       DateTime    @default(now())
+  ticket          Ticket?     @relation(fields: [ticketId], references: [id])
+}
+
