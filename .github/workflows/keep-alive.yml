@@ -21,3 +21,4 @@ jobs:
             echo "RENDER_BACKEND_URL secret not set yet. You can add it in Repo Settings -> Secrets."
           fi
           echo "Keep-alive ping step finished."
+
