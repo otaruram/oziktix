@@ -15,7 +15,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "npm:prisma-client-8e545575dfd99da701f3f27f9c32a002c942332182c71d430bb8b29a2a41d730@^6.19.2",
+    "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.48.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

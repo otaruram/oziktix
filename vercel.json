@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npm --prefix fe run build",
+  "outputDirectory": "fe/dist",
+  "installCommand": "npm --prefix fe install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

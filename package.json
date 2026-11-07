@@ -10,10 +10,8 @@
     "dev": "npm --prefix fe run dev",
     "dev:fe": "npm --prefix fe run dev",
     "dev:be": "npm --prefix be run dev",
+    "build": "npm --prefix fe run build",
     "build:fe": "npm --prefix fe run build",
     "build:be": "npm --prefix be run build"
-  },
-  "dependencies": {
-    "@prisma/client": "^5.22.0"
   }
 }
