@@ -1,7 +1,7 @@
 {
-  "buildCommand": "npm --prefix fe run build",
+  "buildCommand": "cd fe && npm run build",
   "outputDirectory": "fe/dist",
-  "installCommand": "npm --prefix fe install",
+  "installCommand": "cd fe && npm install --include=optional",
   "framework": "vite",
   "rewrites": [
     {
