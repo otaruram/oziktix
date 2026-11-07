@@ -2,10 +2,6 @@
   "name": "oziktix-monolith",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "fe",
-    "be"
-  ],
   "scripts": {
     "dev": "npm --prefix fe run dev",
     "dev:fe": "npm --prefix fe run dev",
