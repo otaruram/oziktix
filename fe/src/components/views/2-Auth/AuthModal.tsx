@@ -20,6 +20,7 @@ export const AuthModal: React.FC = () => {
   const {
     isAuthModalOpen,
     setIsAuthModalOpen,
+    authModalMode,
     currentUser,
     submitOnboardingKyc,
     loginWithGoogle,
@@ -45,8 +46,15 @@ export const AuthModal: React.FC = () => {
     if (isAuthModalOpen) {
       setSubmittedSuccessBanner(null);
       setFormError(null);
+
+      // Existing registered user logging in -> auto-close without showing KYC form!
+      if (currentUser && currentUser.isOnboarded && authModalMode !== 'edit_kyc') {
+        setIsAuthModalOpen(false);
+        return;
+      }
+
       if (currentUser && currentUser.email) {
-        // User already signed in with real Google -> go straight to Step 2 KYC Form
+        // Brand-new Google user (not onboarded yet) OR explicit Edit KYC mode -> Step 2 KYC Form
         setStep(2);
         setFullName(currentUser.name || '');
         setEmail(currentUser.email || '');
@@ -59,9 +67,10 @@ export const AuthModal: React.FC = () => {
         setStep(1);
       }
     }
-  }, [isAuthModalOpen, currentUser]);
+  }, [isAuthModalOpen, currentUser, authModalMode, setIsAuthModalOpen]);
 
   if (!isAuthModalOpen) return null;
+  if (currentUser && currentUser.isOnboarded && authModalMode !== 'edit_kyc') return null;
 
   // Step 2 Auto-Fill Helper: ONLY fills valid NIK, Phone, and Address format for the user's OWN Google account!
   const handleAutoFillKyc = () => {
@@ -232,7 +241,9 @@ export const AuthModal: React.FC = () => {
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/[0.08]">
               <div>
                 <h3 className="text-lg font-display font-extrabold text-white">
-                  Tahap 2: Formulir Resmi Identitas (KYC)
+                  {authModalMode === 'edit_kyc'
+                    ? 'Perbarui Data Resmi Identitas (KYC)'
+                    : 'Tahap 2: Formulir Resmi Identitas (KYC)'}
                 </h3>
                 <p className="text-xs text-slate-400">
                   Terautentikasi sebagai <span className="text-emerald-400 font-mono font-semibold">{email}</span>

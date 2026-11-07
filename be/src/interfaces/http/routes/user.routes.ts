@@ -1,10 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { userRepository } from '../../../repositories/user.repository';
+import { supabase } from '../../../infrastructure/auth/supabaseAuth';
+import { ENV } from '../../../config/env';
 
 export const userRouter = Router();
 
-// GET /api/v1/users/me
+// GET /api/v1/users/me — Resolve existing onboarded user by ID or Email so returning users skip KYC form!
 userRouter.get('/me', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
@@ -12,10 +14,25 @@ userRouter.get('/me', authMiddleware, async (req: Request, res: Response, next: 
       return;
     }
 
-    const dbUser = await userRepository.findById(req.user.id);
-    if (dbUser) {
+    const emailHint = typeof req.query.email === 'string' ? req.query.email : req.user.email;
+    const dbUser = await userRepository.findByIdOrEmail(req.user.id, emailHint, true);
+
+    if (dbUser && dbUser.isOnboarded) {
+      const tokenPayload = {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.fullName,
+        nik: dbUser.nik,
+        phone: dbUser.phone,
+        role: dbUser.role,
+        kycStatus: dbUser.kycStatus,
+        isOnboarded: true,
+      };
+      const sessionToken = `ozik_user_${Buffer.from(JSON.stringify(tokenPayload)).toString('base64')}`;
+
       res.json({
         success: true,
+        token: sessionToken,
         data: {
           id: dbUser.id,
           name: dbUser.fullName,
@@ -23,11 +40,11 @@ userRouter.get('/me', authMiddleware, async (req: Request, res: Response, next: 
           email: dbUser.email,
           nik: dbUser.nik,
           phone: dbUser.phone,
-          avatarUrl: dbUser.avatarUrl,
-          address: dbUser.address,
+          avatarUrl: dbUser.avatarUrl || req.user.avatarUrl || '',
+          address: dbUser.address || 'Bandung, Jawa Barat',
           role: dbUser.role,
           kycStatus: dbUser.kycStatus,
-          isOnboarded: dbUser.isOnboarded,
+          isOnboarded: true,
         },
       });
       return;
@@ -37,16 +54,16 @@ userRouter.get('/me', authMiddleware, async (req: Request, res: Response, next: 
       success: true,
       data: {
         id: req.user.id,
-        name: req.user.name,
-        fullName: req.user.name,
-        email: req.user.email,
-        nik: req.user.nik || '',
-        phone: req.user.phone || '',
-        avatarUrl: req.user.avatarUrl || '',
-        address: req.user.address || '',
-        role: req.user.role || 'VISITOR',
-        kycStatus: req.user.kycStatus || 'PENDING_SUBMISSION',
-        isOnboarded: Boolean(req.user.isOnboarded),
+        name: dbUser?.fullName || req.user.name,
+        fullName: dbUser?.fullName || req.user.name,
+        email: dbUser?.email || req.user.email,
+        nik: dbUser?.nik || '',
+        phone: dbUser?.phone || req.user.phone || '',
+        avatarUrl: dbUser?.avatarUrl || req.user.avatarUrl || '',
+        address: dbUser?.address || req.user.address || '',
+        role: dbUser?.role || req.user.role || 'VISITOR',
+        kycStatus: 'PENDING_SUBMISSION',
+        isOnboarded: false,
       },
     });
   } catch (err) {
@@ -142,7 +159,7 @@ userRouter.post('/switch-role', authMiddleware, async (req: Request, res: Respon
       return;
     }
 
-    const existing = await userRepository.findById(targetId);
+    const existing = await userRepository.findByIdOrEmail(targetId, email || req.user?.email, false);
 
     const saved = await userRepository.upsertUser({
       id: targetId,
@@ -210,3 +227,49 @@ userRouter.post('/reset-playground', authMiddleware, async (req: Request, res: R
     next(err);
   }
 });
+
+// Helper handler for permanent total account deletion (PostgreSQL + Memory Cache + Supabase Auth)
+const handleDeleteAccount = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const targetId = req.body?.userId || req.user?.id;
+    const targetEmail = req.body?.email || req.user?.email;
+
+    if (!targetId && !targetEmail) {
+      res.status(401).json({ success: false, error: 'Unauthenticated' });
+      return;
+    }
+
+    const result = await userRepository.deleteAccountTotally(targetId || '', targetEmail);
+
+    // Also delete from Supabase Auth Admin API if service role key is configured
+    if (ENV.SUPABASE_SERVICE_ROLE_KEY && !ENV.SUPABASE_SERVICE_ROLE_KEY.includes('demo')) {
+      for (const uid of result.deletedIds) {
+        await supabase.auth.admin.deleteUser(uid).catch(() => {});
+      }
+      if (result.email) {
+        try {
+          const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+          const matchedAuthUsers = (data?.users || []).filter(
+            (u) => u.email && u.email.toLowerCase() === result.email.toLowerCase()
+          );
+          for (const au of matchedAuthUsers) {
+            await supabase.auth.admin.deleteUser(au.id).catch(() => {});
+          }
+        } catch {
+          // Ignore admin listUsers error if service role is publishable/restricted
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Akun beserta seluruh data identitas resmi, tiket, dan sesi login Anda telah dihapus secara permanen.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/v1/users/me & POST /api/v1/users/delete-account
+userRouter.delete('/me', authMiddleware, handleDeleteAccount);
+userRouter.post('/delete-account', authMiddleware, handleDeleteAccount);

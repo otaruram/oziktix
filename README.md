@@ -109,7 +109,7 @@ npm run dev
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
 - **Environment Variables:**
-  - `VITE_API_BASE_URL`: URL of your deployed backend on Render (e.g. `https://oziktix-backend.onrender.com`)
+  - `VITE_API_BASE_URL`: URL of your deployed backend on Render (`https://oziktix.onrender.com`)
   - `VITE_SUPABASE_URL`: Your Supabase project URL
   - `VITE_SUPABASE_ANON_KEY`: Your Supabase anon public key
 

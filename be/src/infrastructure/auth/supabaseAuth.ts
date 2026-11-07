@@ -70,6 +70,55 @@ export const userMemoryCache = new Map<string, AuthenticatedUser>(
   Object.entries(DEMO_USERS_MAP)
 );
 
+export function clearUserFromMemoryCache(userId?: string, email?: string): void {
+  if (userId) {
+    userMemoryCache.delete(userId);
+  }
+  if (email) {
+    const normalizedEmail = email.trim().toLowerCase();
+    for (const [key, val] of userMemoryCache.entries()) {
+      if (val.email && val.email.trim().toLowerCase() === normalizedEmail) {
+        userMemoryCache.delete(key);
+      }
+    }
+  }
+}
+
+async function lookupDbUserByIdOrEmail(
+  id: string,
+  email?: string,
+  fallbackAvatar?: string
+): Promise<AuthenticatedUser | null> {
+  const safeEmail = (email || '').trim();
+  const dbUsers: any[] = await prisma.$queryRaw`
+    SELECT * FROM "User"
+    WHERE "id" = ${id}
+       OR (${safeEmail} <> '' AND LOWER("email") = LOWER(${safeEmail}))
+    ORDER BY CASE WHEN "id" = ${id} THEN 0 ELSE 1 END
+    LIMIT 1;
+  `;
+  if (dbUsers.length === 0) return null;
+
+  const dbUser = dbUsers[0];
+  const mapped: AuthenticatedUser = {
+    id: dbUser.id,
+    email: dbUser.email,
+    name: dbUser.fullName,
+    nik: dbUser.nik || '',
+    phone: dbUser.phone || '',
+    avatarUrl: dbUser.avatarUrl || fallbackAvatar || '',
+    address: dbUser.address || 'Bandung, Jawa Barat',
+    role: (dbUser.role as any) || 'VISITOR',
+    kycStatus: dbUser.kycStatus || 'SUBMITTED_TO_ADMIN',
+    isOnboarded: Boolean(dbUser.isOnboarded),
+  };
+
+  if (mapped.isOnboarded) {
+    userMemoryCache.set(mapped.id, mapped);
+  }
+  return mapped;
+}
+
 export async function verifySupabaseToken(token: string): Promise<AuthenticatedUser | null> {
   // 1. Check if token is a signed or base64 JSON session token (Google / Custom / Role)
   if (token.startsWith('ozik_user_')) {
@@ -81,24 +130,32 @@ export async function verifySupabaseToken(token: string): Promise<AuthenticatedU
         if (cached) {
           return {
             ...cached,
-            ...parsed,
             role: parsed.role || cached.role || 'VISITOR',
           };
         }
-        const userObj: AuthenticatedUser = {
-          id: parsed.id,
-          email: parsed.email || 'user@gmail.com',
-          name: parsed.name || parsed.fullName || 'Google User',
-          nik: parsed.nik || '',
-          phone: parsed.phone || '',
-          avatarUrl: parsed.avatarUrl || '',
-          address: parsed.address || 'Bandung, Jawa Barat',
-          role: parsed.role || 'VISITOR',
-          kycStatus: parsed.kycStatus || 'SUBMITTED_TO_ADMIN',
-          isOnboarded: Boolean(parsed.isOnboarded),
-        };
-        userMemoryCache.set(userObj.id, userObj);
-        return userObj;
+        try {
+          const fromDb = await lookupDbUserByIdOrEmail(parsed.id, parsed.email, parsed.avatarUrl);
+          if (fromDb) {
+            return fromDb;
+          }
+          // User was deleted from DB -> reject stale ozik_user_ token
+          return null;
+        } catch {
+          // Transient DB connection issue -> allow parsed session payload temporarily
+          const userObj: AuthenticatedUser = {
+            id: parsed.id,
+            email: parsed.email || 'user@gmail.com',
+            name: parsed.name || parsed.fullName || 'Google User',
+            nik: parsed.nik || '',
+            phone: parsed.phone || '',
+            avatarUrl: parsed.avatarUrl || '',
+            address: parsed.address || 'Bandung, Jawa Barat',
+            role: parsed.role || 'VISITOR',
+            kycStatus: parsed.kycStatus || 'SUBMITTED_TO_ADMIN',
+            isOnboarded: Boolean(parsed.isOnboarded),
+          };
+          return userObj;
+        }
       }
     } catch {
       // Fallthrough
@@ -114,42 +171,32 @@ export async function verifySupabaseToken(token: string): Promise<AuthenticatedU
     try {
       const decoded: any = jwt.decode(token);
       if (decoded && decoded.sub) {
-        if (userMemoryCache.has(decoded.sub)) {
-          return userMemoryCache.get(decoded.sub)!;
-        }
         if (DEMO_USERS_MAP[decoded.sub]) {
           return DEMO_USERS_MAP[decoded.sub];
         }
-        // If it's a real Supabase Google JWT, check DB or build user from JWT claims directly
+        const cached = userMemoryCache.get(decoded.sub);
+        if (cached && cached.isOnboarded) {
+          return cached;
+        }
+
+        const avatarFallback =
+          decoded.user_metadata?.avatar_url || decoded.user_metadata?.picture || '';
+
+        // Check PostgreSQL User table by ID or Email (case-insensitive)
         try {
-          const dbUsers: any[] = await prisma.$queryRaw`
-            SELECT * FROM "User" WHERE "id" = ${decoded.sub} LIMIT 1;
-          `;
-          if (dbUsers.length > 0) {
-            const dbUser = dbUsers[0];
-            const mapped: AuthenticatedUser = {
-              id: dbUser.id,
-              email: dbUser.email,
-              name: dbUser.fullName,
-              nik: dbUser.nik,
-              phone: dbUser.phone,
-              avatarUrl:
-                dbUser.avatarUrl ||
-                decoded.user_metadata?.avatar_url ||
-                decoded.user_metadata?.picture ||
-                '',
-              address: dbUser.address || 'Bandung, Jawa Barat',
-              role: (dbUser.role as any) || 'VISITOR',
-              kycStatus: dbUser.kycStatus || 'SUBMITTED_TO_ADMIN',
-              isOnboarded: Boolean(dbUser.isOnboarded),
-            };
-            userMemoryCache.set(mapped.id, mapped);
-            return mapped;
+          const dbMapped = await lookupDbUserByIdOrEmail(
+            decoded.sub,
+            decoded.email,
+            avatarFallback
+          );
+          if (dbMapped) {
+            return dbMapped;
           }
         } catch {
           // Ignore DB lookup failure
         }
 
+        // Not yet onboarded in DB -> return un-onboarded Google identity WITHOUT caching in userMemoryCache
         const googleUser: AuthenticatedUser = {
           id: decoded.sub,
           email: decoded.email || 'user@gmail.com',
@@ -158,15 +205,14 @@ export async function verifySupabaseToken(token: string): Promise<AuthenticatedU
             decoded.user_metadata?.name ||
             decoded.email?.split('@')[0] ||
             'Google Attendee',
-          nik: decoded.user_metadata?.nik || '3273010000000000',
-          phone: decoded.phone || '+62 812-0000-0000',
-          avatarUrl: decoded.user_metadata?.avatar_url || decoded.user_metadata?.picture || '',
+          nik: '',
+          phone: decoded.phone || '',
+          avatarUrl: avatarFallback,
           address: 'Bandung, Jawa Barat',
           role: (decoded.app_metadata?.role as any) || (decoded.user_metadata?.role as any) || 'VISITOR',
           kycStatus: 'PENDING_SUBMISSION',
           isOnboarded: false,
         };
-        userMemoryCache.set(googleUser.id, googleUser);
         return googleUser;
       }
     } catch {
@@ -182,31 +228,18 @@ export async function verifySupabaseToken(token: string): Promise<AuthenticatedU
     }
 
     const cached = userMemoryCache.get(user.id);
-    if (cached) {
+    if (cached && cached.isOnboarded) {
       return cached;
     }
 
-    // Check database User record
+    const avatarFallback =
+      user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
+
+    // Check database User record by ID or Email
     try {
-      const dbUsers: any[] = await prisma.$queryRaw`
-        SELECT * FROM "User" WHERE "id" = ${user.id} LIMIT 1;
-      `;
-      if (dbUsers.length > 0) {
-        const dbUser = dbUsers[0];
-        const mapped: AuthenticatedUser = {
-          id: dbUser.id,
-          email: dbUser.email,
-          name: dbUser.fullName,
-          nik: dbUser.nik,
-          phone: dbUser.phone,
-          avatarUrl: dbUser.avatarUrl || user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
-          address: dbUser.address || '',
-          role: (dbUser.role as any) || 'VISITOR',
-          kycStatus: dbUser.kycStatus,
-          isOnboarded: dbUser.isOnboarded,
-        };
-        userMemoryCache.set(mapped.id, mapped);
-        return mapped;
+      const dbMapped = await lookupDbUserByIdOrEmail(user.id, user.email, avatarFallback);
+      if (dbMapped) {
+        return dbMapped;
       }
     } catch {
       // Ignore DB lookup failure
@@ -218,7 +251,7 @@ export async function verifySupabaseToken(token: string): Promise<AuthenticatedU
       email: user.email || '',
       name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Google User',
       phone: user.phone || user.user_metadata?.phone || '',
-      avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
+      avatarUrl: avatarFallback,
       role,
       kycStatus: 'PENDING_SUBMISSION',
       isOnboarded: false,

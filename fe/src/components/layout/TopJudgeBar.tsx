@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTicketing } from '../../context/TicketingStore';
 import {
   ShieldCheck,
@@ -19,6 +20,9 @@ import {
   Moon,
   ArrowLeft,
   ArrowRight,
+  Trash2,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 
 export const TopJudgeBar: React.FC = () => {
@@ -35,10 +39,14 @@ export const TopJudgeBar: React.FC = () => {
     selectedSeatIds,
     tickets,
     setIsAuthModalOpen,
+    openKycEditModal,
     logout,
+    deleteAccount,
   } = useTicketing();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [activeLandingSection, setActiveLandingSection] = useState<string>('hero');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +70,182 @@ export const TopJudgeBar: React.FC = () => {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const res = await deleteAccount();
+      if (res.success) {
+        setIsDeleteModalOpen(false);
+        setIsDropdownOpen(false);
+      }
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
+  const renderDeleteAccountModal = () => {
+    if (!isDeleteModalOpen || !currentUser || typeof document === 'undefined') return null;
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-150 pointer-events-auto"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.78)' }}
+        onClick={() => {
+          if (!isDeletingAccount) setIsDeleteModalOpen(false);
+        }}
+      >
+        <div
+          className="relative w-full max-w-md rounded-3xl bg-[#0b0f19] border border-rose-500/40 p-6 shadow-2xl space-y-4 text-left font-mono"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            disabled={isDeletingAccount}
+            onClick={() => setIsDeleteModalOpen(false)}
+            className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors disabled:opacity-40"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/40 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-display font-extrabold text-white">
+                Hapus Akun Secara Total?
+              </h3>
+              <p className="text-[11px] text-slate-400 truncate max-w-[260px]">
+                {currentUser.email}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/[0.08] text-xs space-y-2 leading-relaxed">
+            <p className="text-slate-300 font-sans">
+              Apakah Anda <strong>setuju</strong> menghapus akun <strong>{currentUser.name}</strong> secara permanen? Tindakan ini tidak dapat dibatalkan dan akan menghapus total:
+            </p>
+            <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-400">
+              <li>Profil identitas resmi KYC (NIK KTP, Nomor HP, & Foto) di PostgreSQL</li>
+              <li>Seluruh tiket aktif, riwayat pindah kursi, & reservasi kursi Anda</li>
+              <li>Data autentikasi akun Anda di sistem OzikTix</li>
+            </ul>
+          </div>
+
+          <div className="flex items-center gap-2.5 pt-1">
+            <button
+              type="button"
+              disabled={isDeletingAccount}
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/[0.12] text-slate-200 font-bold text-xs transition-colors disabled:opacity-50"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingAccount}
+              onClick={handleConfirmDeleteAccount}
+              className="flex-[1.4] py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white always-white font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-1.5 disabled:opacity-60"
+            >
+              <Trash2 className="w-3.5 h-3.5 always-white" />
+              <span className="always-white">
+                {isDeletingAccount ? 'Menghapus Total...' : 'Ya, Setuju & Hapus Total'}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  const renderProfileDropdownMenu = () => {
+    if (!isDropdownOpen || !currentUser) return null;
+    return (
+      <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-[#0b0f19] border border-white/[0.12] shadow-2xl p-3 space-y-3 z-50 animate-in fade-in zoom-in-95 duration-150 font-mono text-xs text-left pointer-events-auto">
+        <div className="p-3 rounded-xl bg-slate-950 border border-white/[0.06] space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            {currentUser.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="w-9 h-9 rounded-lg object-cover border border-emerald-400/50"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-sm">
+                {currentUser.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="text-white font-bold text-xs truncate">{currentUser.name}</div>
+              <div className="text-slate-400 text-[10px] truncate">{currentUser.email}</div>
+            </div>
+          </div>
+          <div className="pt-1 border-t border-white/[0.06] space-y-1 text-[10px]">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">NIK KTP:</span>
+              <span className="text-emerald-400 font-semibold">
+                {currentUser.nik || currentUser.maskedNik || '-'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">No. HP:</span>
+              <span className="text-slate-300">{currentUser.phone || '-'}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Status KYC:</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold">
+                {currentUser.isOnboarded ? 'Terdaftar' : 'Belum Lengkap'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Role Aktif:</span>
+              <span className="px-1.5 py-0.2 rounded bg-white/[0.08] text-white font-semibold">
+                {currentUser.role}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-1 border-t border-white/[0.06] pt-1.5">
+          <button
+            onClick={() => {
+              setIsDropdownOpen(false);
+              openKycEditModal();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-emerald-400 hover:bg-emerald-500/10 transition-colors font-medium text-xs"
+          >
+            <UserIcon className="w-3.5 h-3.5" />
+            <span>Ubah Data Resmi KYC & Foto</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsDropdownOpen(false);
+              logout();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-white/[0.06] transition-colors font-medium text-xs"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Logout Akun</span>
+          </button>
+
+          <div className="pt-1 mt-1 border-t border-white/[0.06]">
+            <button
+              onClick={() => {
+                setIsDropdownOpen(false);
+                setIsDeleteModalOpen(true);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/15 transition-colors font-bold text-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus Akun Permanen</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // ============================================================================
@@ -160,6 +344,33 @@ export const TopJudgeBar: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* Landing Mode Profile Pill (Outside overflow-x-auto so dropdown never clips!) */}
+        {currentUser && (
+          <div className="relative ml-2 pointer-events-auto shrink-0" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="antislop-pill-shell !p-1.5 flex items-center gap-1.5 h-[44px] sm:h-[46px] rounded-full transition-colors font-mono text-xs"
+              title="Profil & Pengaturan Akun"
+            >
+              {currentUser.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name}
+                  className="w-7 h-7 rounded-full border border-emerald-400/50 object-cover"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-xs">
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 mr-1" />
+            </button>
+            {renderProfileDropdownMenu()}
+          </div>
+        )}
+
+        {renderDeleteAccountModal()}
       </header>
     );
   }
@@ -422,73 +633,7 @@ export const TopJudgeBar: React.FC = () => {
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 mr-0.5" />
               </button>
 
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-[#0b0f19] border border-white/[0.12] shadow-2xl p-3 space-y-3 z-50 animate-in fade-in zoom-in-95 duration-150 font-mono text-xs text-left">
-                  <div className="p-3 rounded-xl bg-slate-950 border border-white/[0.06] space-y-1.5">
-                    <div className="flex items-center gap-2.5">
-                      {currentUser.avatarUrl && (
-                        <img
-                          src={currentUser.avatarUrl}
-                          alt={currentUser.name}
-                          className="w-9 h-9 rounded-lg object-cover border border-emerald-400/50"
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <div className="text-white font-bold text-xs truncate">{currentUser.name}</div>
-                        <div className="text-slate-400 text-[10px] truncate">{currentUser.email}</div>
-                      </div>
-                    </div>
-                    <div className="pt-1 border-t border-white/[0.06] space-y-1 text-[10px]">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">NIK KTP:</span>
-                        <span className="text-emerald-400 font-semibold">
-                          {currentUser.nik || currentUser.maskedNik}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">No. HP:</span>
-                        <span className="text-slate-300">{currentUser.phone}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Status KYC:</span>
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold">
-                          Terkirim ke Admin
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Role Aktif:</span>
-                        <span className="px-1.5 py-0.2 rounded bg-white/[0.08] text-white font-semibold">
-                          {currentUser.role}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 border-t border-white/[0.06] pt-1.5">
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        setIsAuthModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-emerald-400 hover:bg-emerald-500/10 transition-colors font-medium text-xs"
-                    >
-                      <UserIcon className="w-3.5 h-3.5" />
-                      <span>Ubah Data Resmi KYC & Foto</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        logout();
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors font-medium text-xs"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Logout Akun</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+              {renderProfileDropdownMenu()}
             </div>
           ) : (
             <button
@@ -501,6 +646,8 @@ export const TopJudgeBar: React.FC = () => {
           )}
         </div>
       </div>
+
+      {renderDeleteAccountModal()}
     </header>
   );
 };

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, Seat, Ticket, SwapLog, SystemConfig, UserRole } from '../types/ticketing';
 import { SeatApi } from '../services/seat.api';
 import { TicketApi } from '../services/ticket.api';
@@ -88,6 +88,8 @@ interface TicketingContextType {
   switchRole: (role: UserRole) => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
+  authModalMode: 'login' | 'edit_kyc';
+  openKycEditModal: () => void;
   loginAsJudge: (role?: UserRole) => void;
   loginWithGoogle: () => Promise<void>;
   submitOnboardingKyc: (params: {
@@ -101,6 +103,7 @@ interface TicketingContextType {
     role: UserRole;
   }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 
   // Navigation (Guarded)
   activeTab: ActiveTab;
@@ -195,7 +198,21 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpenState] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'edit_kyc'>('login');
+
+  const setIsAuthModalOpen = useCallback((open: boolean) => {
+    if (!open) {
+      setAuthModalMode('login');
+    }
+    setIsAuthModalOpenState(open);
+  }, []);
+
+  const openKycEditModal = useCallback(() => {
+    setAuthModalMode('edit_kyc');
+    setIsAuthModalOpenState(true);
+  }, []);
+
   const [activeTab, setActiveTabState] = useState<ActiveTab>('landing');
 
   const [seats, setSeats] = useState<Seat[]>([]);
@@ -282,20 +299,68 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [currentUser, addToast]
   );
 
-  // Supabase Auth State Listener (Real Google OAuth)
+  // Track whether this page load came back from a Google OAuth redirect
+  const hadOAuthCallbackRef = useRef<boolean>(
+    typeof window !== 'undefined' &&
+      (window.location.hash.includes('access_token=') || window.location.search.includes('code='))
+  );
+  const lastWelcomedEmailRef = useRef<string | null>(null);
+
+  // Supabase Auth State Listener (Real Google OAuth) — Existing users skip KYC form automatically!
   useEffect(() => {
+    // Sync existing custom session token on load if no OAuth hash is being processed
+    const existingToken = typeof window !== 'undefined' ? localStorage.getItem('oziktix_auth_token') : null;
+    if (existingToken && existingToken.startsWith('ozik_user_') && !hadOAuthCallbackRef.current) {
+      UserApi.getMe(undefined, existingToken).then((dbProfile) => {
+        if (dbProfile && dbProfile.isOnboarded) {
+          setCurrentUser(dbProfile);
+        } else if (dbProfile && !dbProfile.isOnboarded) {
+          localStorage.removeItem('oziktix_auth_token');
+          setCurrentUser(null);
+        }
+      });
+    }
+
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const token = session.access_token;
         localStorage.setItem('oziktix_auth_token', token);
 
-        const dbProfile = await UserApi.getMe();
+        const dbProfile = await UserApi.getMe(session.user.email, token);
         if (dbProfile && dbProfile.isOnboarded) {
+          // Existing registered user found in PostgreSQL -> DO NOT ask to fill KYC form again!
           setCurrentUser({
             ...dbProfile,
-            accessToken: token,
+            accessToken: dbProfile.accessToken || token,
           });
+          setIsAuthModalOpen(false);
+
+          const wasOAuthRedirect = hadOAuthCallbackRef.current;
+          if (wasOAuthRedirect || (event === 'SIGNED_IN' && lastWelcomedEmailRef.current !== dbProfile.email)) {
+            hadOAuthCallbackRef.current = false;
+            lastWelcomedEmailRef.current = dbProfile.email;
+
+            if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+
+            if (wasOAuthRedirect) {
+              if (dbProfile.role === 'ADMIN') {
+                setActiveTabState('admin');
+              } else if (dbProfile.role === 'GATE_OFFICER') {
+                setActiveTabState('scanner');
+              } else {
+                setActiveTabState('seatmap');
+              }
+              addToast(
+                'success',
+                `Selamat Datang Kembali, ${dbProfile.name}!`,
+                'Akun Anda sudah terdaftar di database. Langsung masuk tanpa perlu mengisi formulir ulang.'
+              );
+            }
+          }
         } else {
+          // Brand-new Google user (or previously deleted account) -> prompt Step 2 KYC form
           const googleUser: User = {
             id: session.user.id,
             name:
@@ -315,10 +380,11 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             accessToken: token,
           };
           setCurrentUser(googleUser);
-          // Mandatory onboarding form for new Google users
-          setIsAuthModalOpen(true);
+          setAuthModalMode('login');
+          setIsAuthModalOpenState(true);
         }
       } else if (event === 'SIGNED_OUT') {
+        lastWelcomedEmailRef.current = null;
         localStorage.removeItem('oziktix_auth_token');
         setCurrentUser(null);
         setActiveTabState('landing');
@@ -328,7 +394,7 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [setCurrentUser]);
+  }, [setCurrentUser, setIsAuthModalOpen, addToast]);
 
   // Fetch live seat data from backend AND auto-sync user's active holds into selectedSeatIds
   const refreshSeats = useCallback(async () => {
@@ -805,6 +871,7 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {
       // Ignore
     }
+    lastWelcomedEmailRef.current = null;
     localStorage.removeItem('oziktix_auth_token');
     setCurrentUser(null);
     setSelectedSeatIds([]);
@@ -812,6 +879,63 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setActiveTabState('landing');
     addToast('info', 'Berhasil Logout', 'Anda telah keluar dari sesi akun.');
   }, [setCurrentUser, addToast]);
+
+  const deleteAccount = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Tidak ada akun yang sedang login.' };
+    }
+
+    const res = await UserApi.deleteAccount(currentUser.id, currentUser.email);
+    if (!res.success) {
+      addToast('error', 'Gagal Menghapus Akun', res.error || 'Terjadi kesalahan saat menghapus akun.');
+      return { success: false, error: res.error };
+    }
+
+    try {
+      await signOut();
+    } catch {
+      // Ignore signOut error after server-side deletion
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('oziktix_auth_token');
+      localStorage.removeItem(USER_STORAGE_KEY);
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith('sb-')) {
+          localStorage.removeItem(k);
+        }
+      });
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('sb-')) {
+          sessionStorage.removeItem(k);
+        }
+      });
+    }
+
+    lastWelcomedEmailRef.current = null;
+    setCurrentUser(null);
+    setSelectedSeatIds([]);
+    setTickets([]);
+    setSwapLogs([]);
+    setActiveHoldExpiresAt(null);
+    setQuotaWarning(null);
+    setIsAuthModalOpen(false);
+    setActiveTabState('landing');
+
+    try {
+      const freshSeats = await SeatApi.getSeats();
+      setSeats(freshSeats);
+    } catch {
+      // Ignore
+    }
+
+    addToast(
+      'success',
+      'Akun Berhasil Dihapus Total',
+      'Akun Google, profil KYC, tiket, dan seluruh data Anda telah terhapus permanen dari database.'
+    );
+    return { success: true };
+  }, [currentUser, setCurrentUser, setIsAuthModalOpen, addToast]);
 
   const value = useMemo(
     () => ({
@@ -822,10 +946,13 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       switchRole,
       isAuthModalOpen,
       setIsAuthModalOpen,
+      authModalMode,
+      openKycEditModal,
       loginAsJudge,
       loginWithGoogle,
       submitOnboardingKyc,
       logout,
+      deleteAccount,
       activeTab,
       setActiveTab,
       seats,
@@ -864,6 +991,9 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setCurrentUser,
       switchRole,
       isAuthModalOpen,
+      setIsAuthModalOpen,
+      authModalMode,
+      openKycEditModal,
       activeTab,
       seats,
       tickets,
@@ -896,6 +1026,7 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       loginWithGoogle,
       submitOnboardingKyc,
       logout,
+      deleteAccount,
       setActiveTab,
     ]
   );

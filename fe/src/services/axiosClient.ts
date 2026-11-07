@@ -3,7 +3,7 @@ import { ENV, getAuthToken } from '../config/env';
 
 export const axiosInstance: AxiosInstance = axios.create({
   baseURL: ENV.API_BASE_URL,
-  timeout: 25000,
+  timeout: 45000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

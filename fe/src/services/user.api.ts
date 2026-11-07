@@ -2,27 +2,51 @@ import { axiosInstance } from './axiosClient';
 import { User, UserRole } from '../types';
 
 export const UserApi = {
-  async getMe(): Promise<User | null> {
-    try {
-      const response = await axiosInstance.get('/api/v1/users/me');
+  async getMe(emailHint?: string, explicitToken?: string): Promise<User | null> {
+    const fetchOnce = async (): Promise<User | null> => {
+      const query = emailHint ? `?email=${encodeURIComponent(emailHint)}` : '';
+      const response = await axiosInstance.get(`/api/v1/users/me${query}`, {
+        headers: explicitToken ? { Authorization: `Bearer ${explicitToken}` } : undefined,
+      });
       const d = response.data?.data || response.data;
       if (!d || !d.id) return null;
+
+      const returnedToken = response.data?.token;
+      const isOnboarded = Boolean(d.isOnboarded);
+      if (isOnboarded && returnedToken) {
+        localStorage.setItem('oziktix_auth_token', returnedToken);
+      }
+
       return {
         id: d.id,
         name: d.fullName || d.name || 'Pengguna Google',
         email: d.email,
         avatarUrl: d.avatarUrl || '',
         nik: d.nik || '',
-        maskedNik: d.nik || '3273011508990001',
-        phone: d.phone || '+62 812-2045-8891',
+        maskedNik: d.nik || '',
+        phone: d.phone || '',
         address: d.address || 'Bandung, Jawa Barat',
         role: (d.role as UserRole) || 'VISITOR',
-        kycStatus: d.kycStatus || 'SUBMITTED_TO_ADMIN',
-        isOnboarded: Boolean(d.isOnboarded),
+        kycStatus: d.kycStatus || (isOnboarded ? 'SUBMITTED_TO_ADMIN' : 'PENDING_SUBMISSION'),
+        isOnboarded,
         isGoogleVerified: true,
+        accessToken: returnedToken || explicitToken,
       };
-    } catch {
-      return null;
+    };
+
+    try {
+      return await fetchOnce();
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        return null;
+      }
+      // Retry once after 1.5s in case Render free instance was waking up
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        return await fetchOnce();
+      } catch {
+        return null;
+      }
     }
   },
 
@@ -133,6 +157,36 @@ export const UserApi = {
       return {
         success: false,
         error: err.response?.data?.error || err.message || 'Gagal mereset playground simulasi',
+      };
+    }
+  },
+
+  /**
+   * Permanently and completely delete user's account, KYC data, tickets, holds, and auth session
+   */
+  async deleteAccount(
+    userId?: string,
+    email?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const response = await axiosInstance.post('/api/v1/users/delete-account', {
+        userId,
+        email,
+      });
+      return {
+        success: true,
+        message:
+          response.data?.message ||
+          'Akun beserta seluruh data identitas resmi dan tiket Anda telah dihapus secara permanen.',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error:
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          err.message ||
+          'Gagal menghapus akun secara permanen',
       };
     }
   },

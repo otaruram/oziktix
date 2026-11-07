@@ -11,8 +11,16 @@ import { KeepAliveService } from './services/keepAlive.service';
 
 export const app = express();
 
-// Middlewares
-app.use(cors({ origin: true, credentials: true }));
+// Middlewares — Explicit CORS + Preflight support for Vercel (https://oziktix.vercel.app) & Localhost
+const corsOptions: cors.CorsOptions = {
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
 // Health & Supabase Keep-Alive Ping Endpoints

@@ -13,12 +13,11 @@ jobs:
       - name: Ping Render Backend & Supabase
         run: |
           echo "Pinging OzikTix Services to keep Supabase PostgreSQL and Render warm..."
-          # If user sets RENDER_BACKEND_URL in GitHub repository secrets, ping it:
-          if [ -n "${{ secrets.RENDER_BACKEND_URL }}" ]; then
-            echo "Pinging ${{ secrets.RENDER_BACKEND_URL }}/api/v1/ping..."
-            curl -s -f "${{ secrets.RENDER_BACKEND_URL }}/api/v1/ping" || echo "Ping Render returned non-200"
-          else
-            echo "RENDER_BACKEND_URL secret not set yet. You can add it in Repo Settings -> Secrets."
+          TARGET_URL="${{ secrets.RENDER_BACKEND_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            TARGET_URL="https://oziktix.onrender.com"
           fi
+          echo "Pinging ${TARGET_URL}/api/v1/ping..."
+          curl -s -f "${TARGET_URL}/api/v1/ping" || echo "Ping Render returned non-200"
           echo "Keep-alive ping step finished."
 
