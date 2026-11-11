@@ -39,10 +39,13 @@ html.theme-light {
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
   margin: 0;
+  max-width: 100%;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -174,6 +177,7 @@ html.theme-light .text-cyan-300 {
 .antislop-highlight {
   position: relative;
   display: inline-flex;
+  max-width: 100%;
   overflow: hidden;
   vertical-align: baseline;
   padding: 0.04em 0.24em;

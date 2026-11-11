@@ -24,7 +24,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const isLanding = activeTab === 'landing';
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-slate-100 font-sans">
+    <div className="min-h-screen w-full overflow-x-hidden flex flex-col bg-black text-slate-100 font-sans">
       <TopJudgeBar />
 
       {isLanding ? (

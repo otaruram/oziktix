@@ -254,8 +254,8 @@ export const TopJudgeBar: React.FC = () => {
   // ============================================================================
   if (activeTab === 'landing') {
     return (
-      <header className="fixed top-0 left-0 right-0 z-50 pt-3 sm:pt-4 px-3 flex justify-center pointer-events-none">
-        <div className="antislop-pill-shell pointer-events-auto flex items-center gap-1 sm:gap-1.5 max-w-full overflow-x-auto no-scrollbar">
+      <header className="fixed top-0 left-0 right-0 z-50 pt-3 sm:pt-4 px-3 flex justify-center items-center pointer-events-none">
+        <div className="antislop-pill-shell pointer-events-auto flex items-center gap-1 sm:gap-1.5 min-w-0 max-w-full overflow-x-auto no-scrollbar">
           {/* Brand Pill */}
           <button
             onClick={() => scrollToSection('hero')}

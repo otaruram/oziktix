@@ -157,7 +157,7 @@ export const EventHero: React.FC = () => {
           </div>
 
           {/* Antislop Display Headline with Sliding Monochrome Difference Highlight */}
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-[1.12]">
+          <h1 className="text-[26px] sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-[1.14]">
             Sistem Tiket Kursi Interaktif &{' '}
             <span className="antislop-highlight">
               <span className="antislop-highlight-bg" />
@@ -263,16 +263,16 @@ export const EventHero: React.FC = () => {
         <div className="w-full max-w-6xl mx-auto mt-10 sm:mt-12">
           <div className="rounded-3xl border border-white/[0.12] bg-[#0b0f19] overflow-hidden shadow-2xl">
             {/* Browser/Terminal Top Chrome */}
-            <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between bg-slate-950/70 font-mono text-xs">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+            <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between gap-2 bg-slate-950/70 font-mono text-xs">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80 shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80 shrink-0" />
                 <span className="ml-2 text-slate-400 text-[11px] truncate">
                   oziktix://summarecon-bandung-atrium/live-architecture
                 </span>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0 whitespace-nowrap">
                 PostgreSQL Live Sync
               </span>
             </div>
@@ -382,6 +382,8 @@ export const EventHero: React.FC = () => {
                   key={item.step}
                   onClick={() => setActiveStepIdx(idx)}
                   className={`p-3.5 rounded-2xl border text-left transition-all ${
+                    idx === WORKFLOW_STEPS.length - 1 ? 'col-span-2 sm:col-span-1' : ''
+                  } ${
                     isActive
                       ? 'bg-emerald-400 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/15 scale-[1.01]'
                       : 'bg-[#0b0f19] border-white/[0.08] text-slate-300 hover:border-white/[0.2]'
