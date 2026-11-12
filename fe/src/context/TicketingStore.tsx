@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, Seat, Ticket, SwapLog, SystemConfig, UserRole } from '../types/ticketing';
+import {
+  PricingConfig,
+  DEFAULT_PRICING,
+  PackageCode,
+  CategoryCode,
+  PriceQuote,
+  computeQuote,
+  packageForSeatCount,
+} from '../utils/pricing';
+import { PricingApi } from '../services/pricing.api';
 import { SeatApi } from '../services/seat.api';
 import { TicketApi } from '../services/ticket.api';
 import { CheckoutApi } from '../services/checkout.api';
@@ -70,7 +80,7 @@ interface ToastMessage {
 }
 
 export const DEFAULT_CONFIG: SystemConfig = {
-  maxSeatsPerUser: 2,
+  maxSeatsPerUser: 3,
   holdTtlSeconds: 300, // 5:00 minutes
   totpPeriodSeconds: 30,
   gateWindowHours: 2,
@@ -115,8 +125,14 @@ interface TicketingContextType {
   tickets: Ticket[];
   swapLogs: SwapLog[];
   config: SystemConfig;
+  pricingConfig: PricingConfig;
+  selectedPackage: PackageCode;
+  setSelectedPackage: (pkg: PackageCode) => void;
+  updatePricingConfig: (newPricing: Partial<PricingConfig>) => Promise<{ success: boolean; error?: string }>;
+  currentQuote: PriceQuote | null;
   refreshSeats: () => Promise<void>;
   refreshTickets: () => Promise<void>;
+  refreshPricing: () => Promise<void>;
   updateConfig: (newConfig: Partial<SystemConfig>) => Promise<void>;
 
   // Selection & Hold
@@ -220,6 +236,8 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [swapLogs, setSwapLogs] = useState<SwapLog[]>([]);
   const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(DEFAULT_PRICING);
+  const [selectedPackage, setSelectedPackage] = useState<PackageCode>('SINGLE');
 
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [activeHoldExpiresAt, setActiveHoldExpiresAt] = useState<number | null>(null);
@@ -462,6 +480,52 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshTickets();
   }, [refreshTickets, currentUser]);
 
+  const refreshPricing = useCallback(async () => {
+    try {
+      const cfg = await PricingApi.getPricing();
+      setPricingConfig(cfg);
+    } catch {
+      // Keep existing
+    }
+  }, []);
+
+  const updatePricingConfig = useCallback(
+    async (newPricing: Partial<PricingConfig>) => {
+      const res = await PricingApi.updatePricing(newPricing);
+      if (!res.success) {
+        addToast('error', 'Gagal Mengubah Harga', res.error || 'Terjadi kesalahan');
+        return { success: false, error: res.error };
+      }
+      if (res.data) {
+        setPricingConfig(res.data);
+      }
+      addToast('success', 'Harga & Diskon Diperbarui', 'Perhitungan otomatis telah disinkronkan ke seluruh sistem.');
+      return { success: true };
+    },
+    [addToast]
+  );
+
+  useEffect(() => {
+    refreshPricing();
+  }, [refreshPricing]);
+
+  // Compute current quote dynamically based on selected seats and active pricing rules
+  const currentQuote = useMemo<PriceQuote | null>(() => {
+    if (selectedSeatIds.length === 0) return null;
+    const selectedSeats = seats.filter((s) => selectedSeatIds.includes(s.id));
+    if (selectedSeats.length === 0) return null;
+    const tier = (selectedSeats[0].tier as CategoryCode) || 'VIP';
+    const pkg =
+      packageForSeatCount(pricingConfig, selectedSeatIds.length)?.code ||
+      selectedPackage ||
+      'SINGLE';
+    try {
+      return computeQuote(pricingConfig, tier, pkg);
+    } catch {
+      return null;
+    }
+  }, [selectedSeatIds, seats, selectedPackage, pricingConfig]);
+
   // Periodic polling for live seats
   useEffect(() => {
     const interval = setInterval(() => {
@@ -535,10 +599,18 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const targetSeat = seats.find((s) => s.id === seatId);
       if (!targetSeat) return { success: false, error: 'Kursi tidak ditemukan' };
 
+      const selectedSeats = seats.filter((s) => selectedSeatIds.includes(s.id));
+      if (selectedSeats.length > 0 && selectedSeats[0].tier !== targetSeat.tier) {
+        const msg = `Dalam 1 paket pesanan, semua kursi harus dalam kategori yang sama (${selectedSeats[0].tier}). Silakan batalkan pilihan jika ingin memesan kategori ${targetSeat.tier}.`;
+        setQuotaWarning(msg);
+        addToast('warning', 'Pilihan Kategori Berbeda', msg);
+        return { success: false, error: msg };
+      }
+
       if (selectedSeatIds.length >= config.maxSeatsPerUser && !selectedSeatIds.includes(seatId)) {
         const msg = `Batas Maksimal ${config.maxSeatsPerUser} Kursi per Transaksi: Anda sudah memilih ${selectedSeatIds.length} kursi (${selectedSeatIds.join(', ')}). Klik tombol "Lanjut ke Halaman Pembayaran" atau batalkan salah satu kursi terlebih dahulu.`;
         setQuotaWarning(msg);
-        addToast('warning', 'Maksimal 2 Kursi Dipilih', msg);
+        addToast('warning', `Maksimal ${config.maxSeatsPerUser} Kursi Dipilih`, msg);
         return { success: false, error: msg };
       }
 
@@ -628,7 +700,11 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return { success: false, error: 'Belum ada kursi yang dipilih' };
       }
 
-      const res = await CheckoutApi.confirmCheckout(selectedSeatIds, currentUser);
+      const targetPkg =
+        packageForSeatCount(pricingConfig, selectedSeatIds.length)?.code ||
+        selectedPackage ||
+        'SINGLE';
+      const res = await CheckoutApi.confirmCheckout(selectedSeatIds, currentUser, 'qris', targetPkg);
 
       if (!res.success) {
         addToast('error', 'Checkout Gagal', res.error || 'Gagal memproses pembayaran');
@@ -971,8 +1047,14 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       tickets,
       swapLogs,
       config,
+      pricingConfig,
+      selectedPackage,
+      setSelectedPackage,
+      updatePricingConfig,
+      currentQuote,
       refreshSeats,
       refreshTickets,
+      refreshPricing,
       updateConfig,
       selectedSeatIds,
       selectSeat,
@@ -1011,8 +1093,14 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       tickets,
       swapLogs,
       config,
+      pricingConfig,
+      selectedPackage,
+      setSelectedPackage,
+      updatePricingConfig,
+      currentQuote,
       refreshSeats,
       refreshTickets,
+      refreshPricing,
       updateConfig,
       selectedSeatIds,
       selectSeat,

@@ -5,10 +5,108 @@ import { StatefulEngine } from '../infrastructure/crypto/statefulEngine';
 import { Ticket, TicketStatus } from '@prisma/client';
 import { seatService } from './seat.service';
 import { ticketRepository } from '../repositories/ticket.repository';
+import { pricingService } from './pricing.service';
+import {
+  CategoryCode,
+  MAX_SEATS_PER_ORDER,
+  PriceQuote,
+  computeQuote,
+  getPackage,
+  packageForSeatCount,
+} from '../domain/pricing';
 
 export class CheckoutService {
   public async getUserTickets(userId: string): Promise<Ticket[]> {
     return ticketRepository.findByUser(userId);
+  }
+
+  /**
+   * Konfirmasi order paket (Single / Couple / Group) — harga dihitung ulang di server.
+   * Aturan: jumlah kursi == ukuran paket, semua kursi dalam 1 kategori, maks 3 kursi.
+   */
+  public async confirmOrder(
+    seatIds: string[],
+    attendeePhone: string,
+    user: AuthenticatedUser,
+    requestedPackage?: string
+  ): Promise<{ tickets: Ticket[]; quote: PriceQuote; orderId: string }> {
+    const uniqueSeatIds = Array.from(new Set(seatIds));
+    if (uniqueSeatIds.length === 0) {
+      throw new BadRequestError('Pilih minimal 1 kursi.');
+    }
+    if (uniqueSeatIds.length > MAX_SEATS_PER_ORDER) {
+      throw new BadRequestError(`Maksimal ${MAX_SEATS_PER_ORDER} kursi per transaksi (paket Group).`);
+    }
+
+    const templates = await Promise.all(uniqueSeatIds.map((id) => seatService.findTemplateById(id)));
+    const missing = uniqueSeatIds.filter((_, i) => !templates[i]);
+    if (missing.length > 0) {
+      throw new NotFoundError(`Kursi ${missing.join(', ')} tidak ditemukan.`);
+    }
+
+    const tiers = new Set(templates.map((t) => t!.tier));
+    if (tiers.size > 1) {
+      throw new BadRequestError('Semua kursi dalam satu paket harus berada di kategori yang sama.');
+    }
+    const category = templates[0]!.tier as CategoryCode;
+
+    const config = await pricingService.getConfig();
+    const pkg = requestedPackage
+      ? getPackage(config, requestedPackage.toUpperCase())
+      : packageForSeatCount(config, uniqueSeatIds.length);
+    if (!pkg || !pkg.enabled) {
+      throw new BadRequestError(`Paket ${requestedPackage || `${uniqueSeatIds.length} kursi`} tidak tersedia.`);
+    }
+    if (pkg.seats !== uniqueSeatIds.length) {
+      throw new BadRequestError(
+        `Paket ${pkg.name} membutuhkan tepat ${pkg.seats} kursi, Anda memilih ${uniqueSeatIds.length}.`
+      );
+    }
+
+    const quote = computeQuote(config, category, pkg.code);
+    const orderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // All-or-nothing pre-check: never issue a partial package if one seat is already owned
+    const alreadyOwned = await prisma.$queryRaw<any[]>`
+      SELECT "seatId" FROM "Ticket"
+      WHERE "userId" = ${user.id}
+        AND "seatId" = ANY(${uniqueSeatIds})
+        AND "status" IN ('VALID'::"TicketStatus", 'CHECKED_IN'::"TicketStatus");
+    `;
+    if (alreadyOwned.length > 0) {
+      throw new ConflictError(
+        `Kursi ${alreadyOwned.map((r) => r.seatId).join(', ')} sudah dibeli. Pilih kursi lain.`
+      );
+    }
+
+    // Distribute ticketTotal across seats so SUM(pricePaid) == ticketTotal exactly (no rounding drift)
+    const n = uniqueSeatIds.length;
+    const baseShare = Math.floor(quote.ticketTotal / n);
+    const remainder = quote.ticketTotal - baseShare * n;
+
+    try {
+      await pricingService.ensureSchema();
+    } catch {
+      // Non-fatal: ticket still issued, pricing metadata just won't persist
+    }
+
+    const tickets: Ticket[] = [];
+    for (let i = 0; i < n; i++) {
+      const ticket = await this.confirmCheckout(uniqueSeatIds[i], attendeePhone, user);
+      const pricePaid = baseShare + (i === 0 ? remainder : 0);
+      try {
+        await prisma.$executeRaw`
+          UPDATE "Ticket"
+          SET "pricePaid" = ${pricePaid}, "packageType" = ${pkg.code}, "orderId" = ${orderId}
+          WHERE "id" = ${ticket.id};
+        `;
+      } catch {
+        // Column may be unavailable on a cold DB; revenue falls back to seat base price
+      }
+      tickets.push({ ...ticket, pricePaid, packageType: pkg.code, orderId } as Ticket);
+    }
+
+    return { tickets, quote, orderId };
   }
 
   /**

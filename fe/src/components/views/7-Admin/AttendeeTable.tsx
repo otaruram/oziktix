@@ -5,6 +5,7 @@ import { Ticket, SwapLog } from '../../../types';
 import { StatusBadge } from '../../common/StatusBadge';
 import { MetricsRow } from './MetricsRow';
 import { VenueMiniMap } from './VenueMiniMap';
+import { PricingDiscountManager } from './PricingDiscountManager';
 import {
   Download,
   Search,
@@ -17,6 +18,7 @@ import {
   Activity,
   Clock,
   QrCode,
+  Tag,
 } from 'lucide-react';
 
 export const AttendeeTable: React.FC = () => {
@@ -27,7 +29,7 @@ export const AttendeeTable: React.FC = () => {
   const [swapLogs, setSwapLogs] = useState<SwapLog[]>([]);
   const [gateLogs, setGateLogs] = useState<any[]>([]);
   const [globalHolds, setGlobalHolds] = useState<any[]>([]);
-  const [activeAdminTab, setActiveAdminTab] = useState<'stream' | 'users' | 'tickets' | 'swaps'>('stream');
+  const [activeAdminTab, setActiveAdminTab] = useState<'stream' | 'users' | 'tickets' | 'swaps' | 'pricing'>('stream');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('ALL');
@@ -212,6 +214,18 @@ export const AttendeeTable: React.FC = () => {
               >
                 <ArrowLeftRight className="w-3.5 h-3.5" />
                 <span>3. Swap & Gate ({swapLogs.length + gateLogs.length})</span>
+              </button>
+
+              <button
+                onClick={() => setActiveAdminTab('pricing')}
+                className={`px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all ${
+                  activeAdminTab === 'pricing'
+                    ? 'bg-emerald-400 text-slate-950 font-extrabold shadow-sm'
+                    : 'bg-slate-950 border border-white/[0.08] text-slate-300 hover:text-white'
+                }`}
+              >
+                <Tag className="w-3.5 h-3.5" />
+                <span>4. Pengaturan Harga & Diskon</span>
               </button>
             </div>
 
@@ -704,6 +718,9 @@ export const AttendeeTable: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* TAB 4: PRICING & DISCOUNT CONFIGURATION (SUMMARECON #03) */}
+          {activeAdminTab === 'pricing' && <PricingDiscountManager />}
         </div>
 
         {/* Venue Mini-Map (1 col) */}

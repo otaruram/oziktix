@@ -4,6 +4,7 @@ import { ConflictError, QuotaExceededError, NotFoundError, BadRequestError } fro
 import { StatefulEngine } from '../infrastructure/crypto/statefulEngine';
 import { Seat, SeatStatus, Ticket, TicketStatus } from '@prisma/client';
 import { ShowcaseSeederService } from './showcaseSeeder.service';
+import { MAX_SEATS_PER_ORDER } from '../domain/pricing';
 
 interface CanonicalSeatTemplate {
   id: string;
@@ -286,10 +287,11 @@ export class SeatService {
     }
 
     // Count user's own active holds (excluding simulated competing hold and target seat itself)
+    // Max 3 = ukuran paket terbesar (Group)
     const myOwnOtherHolds = existingHolds.filter((h) => !h.isSimulatedOther && h.seatId !== seatId);
-    if (myOwnOtherHolds.length >= 2) {
+    if (myOwnOtherHolds.length >= MAX_SEATS_PER_ORDER) {
       throw new QuotaExceededError(
-        `Maksimal 2 kursi per transaksi. Anda sudah memilih ${myOwnOtherHolds.length} kursi.`
+        `Maksimal ${MAX_SEATS_PER_ORDER} kursi per transaksi (paket Group). Anda sudah memilih ${myOwnOtherHolds.length} kursi.`
       );
     }
 

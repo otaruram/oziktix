@@ -9,13 +9,15 @@ export const CheckoutApi = {
   async confirmCheckout(
     seatIds: string[],
     user: User,
-    paymentMethod: string = 'qris'
-  ): Promise<{ success: boolean; tickets?: Ticket[]; error?: string }> {
+    paymentMethod: string = 'qris',
+    packageType?: string
+  ): Promise<{ success: boolean; tickets?: Ticket[]; quote?: any; error?: string }> {
     try {
       const response = await axiosInstance.post('/api/v1/checkout/confirm', {
         seatId: seatIds[0],
         seatIds,
         paymentMethod,
+        packageType,
         attendeePhone: user.phone || '+62 812-3456-7890',
         userId: user.id,
         userEmail: user.email,
@@ -28,6 +30,7 @@ export const CheckoutApi = {
 
       return {
         success: true,
+        quote: response.data.quote,
         tickets: tickets.map((t: any) => ({
           ...t,
           tier: t.tier || t.seat?.tier || 'VIP',

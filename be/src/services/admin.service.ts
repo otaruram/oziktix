@@ -30,7 +30,10 @@ export class AdminService {
       const reservedCount = activeHolds.length;
       const availableCount = Math.max(0, totalCapacity - new Set(activeTickets.map((t) => t.seatId)).size - new Set(activeHolds.map((h) => h.seatId)).size);
       const checkedInCount = activeTickets.filter((t) => t.status === TicketStatus.CHECKED_IN).length;
-      const grossRevenue = activeTickets.reduce((sum, t) => sum + (t.seat?.price || 250000), 0);
+      const grossRevenue = activeTickets.reduce(
+        (sum, t) => sum + ((t as any).pricePaid ?? t.seat?.price ?? 250000),
+        0
+      );
 
       return {
         totalCapacity,
@@ -73,7 +76,9 @@ export class AdminService {
           id: t.id,
           seatId: t.seatId,
           tier: t.seat?.tier || 'VIP',
-          price: t.seat?.price || 250000,
+          price: (t as any).pricePaid ?? t.seat?.price ?? 250000,
+          packageType: (t as any).packageType || 'SINGLE',
+          orderId: (t as any).orderId || null,
           userId: t.userId,
           userName: u?.fullName || t.userName,
           userEmail: t.userEmail,
@@ -143,7 +148,8 @@ export class AdminService {
       'Ticket ID',
       'Seat Coordinate',
       'Tier',
-      'Price (IDR)',
+      'Package',
+      'Price Paid (IDR)',
       'Attendee Name',
       'Google Email',
       'NIK KTP',
@@ -163,7 +169,8 @@ export class AdminService {
         `"${t.id}"`,
         `"${t.seatId}"`,
         `"${t.seat?.tier || 'VIP'}"`,
-        t.seat?.price || 250000,
+        `"${(t as any).packageType || 'SINGLE'}"`,
+        (t as any).pricePaid ?? t.seat?.price ?? 250000,
         `"${t.userName}"`,
         `"${t.userEmail}"`,
         `"${u?.nik || '3273011508990001'}"`,

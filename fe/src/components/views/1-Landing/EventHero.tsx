@@ -55,16 +55,16 @@ const WORKFLOW_STEPS = [
   },
   {
     step: '03',
-    tag: 'TAHAP 3 • ATOMIC SEAT LOCK (MAX 2)',
-    title: 'Pilih Kursi Atrium (60 Kursi Fisik) & Kunci 5 Menit',
+    tag: 'TAHAP 3 • ATOMIC SEAT LOCK (PAKET TIKET)',
+    title: 'Pilih Kategori & Paket Kursi Atrium & Kunci 5 Menit',
     dbTable: 'public."Seat" (RLS Enabled)',
     description:
-      'Pengguna memilih maksimal 2 kursi di Main Atrium Summarecon Mall Bandung (VIP, Regular, atau Festival). Sistem mengunci baris di PostgreSQL selama 5:00 menit (300 detik) dan menolak tabrakan dengan HTTP 409 Conflict.',
+      'Pengguna memilih kategori (VIP, Reguler, Festival) dan paket (Single 1 org, Couple 2 org, Group 3 org) di Main Atrium SMB dengan diskon otomatis. Sistem mengunci baris di PostgreSQL selama 5:00 menit (300 detik) dan menolak tabrakan dengan HTTP 409 Conflict.',
     image:
       'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=900&auto=format&fit=crop&q=80',
     highlights: [
-      'Jatah kuota ketat: Maksimal 2 kursi per akun Google',
-      'Jika sudah checkout 1 kursi, sisa jatah otomatis menjadi 1 kursi',
+      'Paket Single, Couple (hemat 5%), & Group (hemat 10%) per akun Google',
+      'Pilihan nomor kursi interaktif di denah matriks Main Atrium',
       'Banner Checkout & 1-Click Bayar langsung muncul saat kursi diklik',
     ],
   },
@@ -247,9 +247,9 @@ export const EventHero: React.FC = () => {
               </span>
             </div>
             <div className="p-3.5 rounded-2xl bg-[#0b0f19] border border-white/[0.08]">
-              <span className="text-[10px] text-slate-500 uppercase block">Batas Kuota</span>
-              <span className="text-sm sm:text-base font-bold text-white">Maks 2 Kursi</span>
-              <span className="text-[10px] text-amber-400 block">Per Akun Google & NIK</span>
+              <span className="text-[10px] text-slate-500 uppercase block">Paket Pesanan</span>
+              <span className="text-sm sm:text-base font-bold text-white">Single, Couple & Group</span>
+              <span className="text-[10px] text-amber-400 block">Diskon Otomatis s/d 10%</span>
             </div>
             <div className="p-3.5 rounded-2xl bg-[#0b0f19] border border-white/[0.08]">
               <span className="text-[10px] text-slate-500 uppercase block">Database & RLS</span>
@@ -534,7 +534,7 @@ export const EventHero: React.FC = () => {
                   + QR berputar setiap 30 detik (HMAC-SHA256 + TOTP). Screenshot statis ditolak di Gate!
                 </li>
                 <li className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-                  + Atomic SQL Row Lock (5:00 TTL) + batas ketat maksimal 2 kursi per akun Google.
+                  + Atomic SQL Row Lock (5:00 TTL) + paket pesanan fleksibel (Single, Couple, Group).
                 </li>
                 <li className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
                   + Wajib Login Google → Isi Form Resmi KYC & Foto → Diverifikasi di Admin Console.
@@ -563,7 +563,7 @@ export const EventHero: React.FC = () => {
               </h2>
             </div>
             <span className="text-xs font-mono text-slate-400">
-              Maksimal pembelian 2 kursi per akun Google terverifikasi
+              Pilihan paket Single (1 org), Couple (2 org), &amp; Group (3 org) dengan diskon otomatis
             </span>
           </div>
 

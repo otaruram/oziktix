@@ -5,6 +5,14 @@ import { StageView } from './StageView';
 import { Concurrency409Test } from './Concurrency409Test';
 import { StatusBadge } from '../../common/StatusBadge';
 import {
+  formatRupiah,
+  getCategory,
+  computeUnitPrice,
+  computeCategoryDiscount,
+  CategoryCode,
+  PackageCode,
+} from '../../../utils/pricing';
+import {
   ShieldAlert,
   Lock,
   ArrowRight,
@@ -15,6 +23,9 @@ import {
   Check,
   X,
   UserCheck,
+  Tag,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 
 export const InteractiveGrid: React.FC = () => {
@@ -34,17 +45,29 @@ export const InteractiveGrid: React.FC = () => {
     setActiveTab,
     setIsAuthModalOpen,
     addToast,
+    pricingConfig,
+    selectedPackage,
+    setSelectedPackage,
+    currentQuote,
   } = useTicketing();
 
   const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
   const [isRestarting, setIsRestarting] = useState<boolean>(false);
+  const [filterCategory, setFilterCategory] = useState<CategoryCode | 'ALL'>('ALL');
 
   const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
 
   const getTierForRank = (row: string) => {
-    if (row === 'A' || row === 'B') return { name: 'VIP', price: 250000 };
-    if (row === 'C' || row === 'D') return { name: 'REGULAR', price: 150000 };
-    return { name: 'FESTIVAL', price: 100000 };
+    if (row === 'A' || row === 'B') {
+      const cat = getCategory(pricingConfig, 'VIP');
+      return { name: 'VIP', price: cat ? computeUnitPrice(cat) : 225000, basePrice: cat?.basePrice || 250000 };
+    }
+    if (row === 'C' || row === 'D') {
+      const cat = getCategory(pricingConfig, 'REGULAR');
+      return { name: 'REGULAR', price: cat ? computeUnitPrice(cat) : 150000, basePrice: cat?.basePrice || 150000 };
+    }
+    const cat = getCategory(pricingConfig, 'FESTIVAL');
+    return { name: 'FESTIVAL', price: cat ? computeUnitPrice(cat) : 90000, basePrice: cat?.basePrice || 100000 };
   };
 
   const userOwnedCount = currentUser
@@ -68,13 +91,7 @@ export const InteractiveGrid: React.FC = () => {
     seats.length - soldSeatsCount - bookedOthersCount - selectedSeatIds.length
   );
 
-  const formatRupiah = (val: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
+
 
   const handleRestartFromZero = async () => {
     setIsRestarting(true);
@@ -120,7 +137,7 @@ export const InteractiveGrid: React.FC = () => {
     if (isQuotaFull) {
       addToast(
         'warning',
-        'Maksimal 2 Kursi Dipilih',
+        `Maksimal ${config.maxSeatsPerUser} Kursi Dipilih`,
         `Anda sudah memilih ${selectedSeatIds.length} kursi (${selectedSeatIds.join(', ')}). Klik kursi yang dipilih jika ingin mengganti, atau langsung klik Lanjut ke Pembayaran!`
       );
       return;
@@ -201,7 +218,7 @@ export const InteractiveGrid: React.FC = () => {
             <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="text-xs space-y-1">
               <div className="font-bold uppercase font-mono text-amber-400">
-                Batas Maksimal 2 Kursi Per Transaksi
+                Batas Maksimal Kuota Kursi ({config.maxSeatsPerUser} Kursi)
               </div>
               <div className="text-white font-medium">{quotaWarning}</div>
             </div>
@@ -255,6 +272,122 @@ export const InteractiveGrid: React.FC = () => {
         </div>
       )}
 
+      {/* Step 1: Kategori & Paket Tiket (Kebutuhan Summarecon #01 & #03) */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#0b0f19] border border-white/[0.1] space-y-4 font-mono text-xs text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2">
+            <Tag className="w-4 h-4 text-emerald-400" />
+            <h3 className="font-extrabold text-white text-sm uppercase">
+              Tahap 1: Pilih Kategori & Paket Tiket
+            </h3>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Sistem pengelompokan rapi anti-bingung sesuai standar Summarecon
+          </span>
+        </div>
+
+        {/* Kategori Tabs */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {pricingConfig.categories.map((c) => {
+            const isSelected = filterCategory === c.code;
+            const discount = computeCategoryDiscount(c);
+            const unitPrice = computeUnitPrice(c);
+
+            return (
+              <button
+                key={c.code}
+                type="button"
+                onClick={() => setFilterCategory((prev) => (prev === c.code ? 'ALL' : c.code))}
+                className={`p-3.5 rounded-xl border text-left transition-all ${
+                  isSelected
+                    ? 'bg-emerald-500/20 border-emerald-400 shadow-md shadow-emerald-500/10'
+                    : 'bg-slate-950 border-white/[0.08] hover:border-white/[0.2]'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-1">
+                  <span className="font-extrabold text-white text-sm">{c.name}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-white/[0.08] text-slate-300">
+                    Row {c.rows.join(' & ')}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-emerald-400 font-extrabold text-sm">{formatRupiah(unitPrice)}</span>
+                  {discount > 0 && (
+                    <span className="text-slate-500 line-through text-[11px]">
+                      {formatRupiah(c.basePrice)}
+                    </span>
+                  )}
+                </div>
+                {c.discountLabel && (
+                  <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    <Sparkles className="w-2.5 h-2.5" />
+                    {c.discountLabel} (-{formatRupiah(discount)})
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Paket Selection Pills */}
+        <div className="pt-2 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-slate-300 text-xs">
+            <Users className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="font-bold text-white">Paket Pesanan:</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {pricingConfig.packages.map((pkg) => {
+              const isSelected = selectedPackage === pkg.code;
+              return (
+                <button
+                  key={pkg.code}
+                  type="button"
+                  onClick={() => setSelectedPackage(pkg.code)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/20 font-extrabold'
+                      : 'bg-slate-950 text-slate-300 border border-white/[0.1] hover:text-white'
+                  }`}
+                >
+                  <span>{pkg.name}</span>
+                  {pkg.discountPercent > 0 && (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded font-extrabold ${
+                        isSelected ? 'bg-slate-950 text-cyan-300' : 'bg-emerald-500/20 text-emerald-400'
+                      }`}
+                    >
+                      Hemat {pkg.discountPercent}%
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tahap 2 Helper Banner */}
+        <div className="p-3 rounded-xl bg-slate-950/80 border border-white/[0.08] text-[11px] text-slate-300 flex items-center justify-between">
+          <div>
+            <strong className="text-white">Tahap 2:</strong> Pilih nomor kursi pada denah di bawah{' '}
+            {filterCategory !== 'ALL' && (
+              <span className="text-emerald-400 font-bold">
+                (Kategori {filterCategory} — Baris {filterCategory === 'VIP' ? 'A & B' : filterCategory === 'REGULAR' ? 'C & D' : 'E & F'})
+              </span>
+            )}
+            . Kuota paket aktif: <strong className="text-cyan-400">{pricingConfig.packages.find((p) => p.code === selectedPackage)?.seats || 1} Kursi</strong>.
+          </div>
+          {filterCategory !== 'ALL' && (
+            <button
+              onClick={() => setFilterCategory('ALL')}
+              className="text-xs text-slate-400 hover:text-white underline shrink-0 ml-2"
+            >
+              Tampilkan Semua Baris
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Grid Canvas + Cart Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Atrium Grid (3 cols) */}
@@ -266,9 +399,15 @@ export const InteractiveGrid: React.FC = () => {
             {rows.map((rowLetter) => {
               const tier = getTierForRank(rowLetter);
               const rowSeats = seats.filter((s) => s.row === rowLetter);
+              const isRowDimmed = filterCategory !== 'ALL' && tier.name !== filterCategory;
 
               return (
-                <div key={rowLetter} className="flex items-center gap-2.5">
+                <div
+                  key={rowLetter}
+                  className={`flex items-center gap-2.5 transition-opacity duration-300 ${
+                    isRowDimmed ? 'opacity-30' : 'opacity-100'
+                  }`}
+                >
                   {/* Row Letter */}
                   <div className="w-7 h-8 rounded-lg bg-slate-950 border border-white/[0.1] flex items-center justify-center font-mono font-bold text-xs text-white shrink-0">
                     {rowLetter}
@@ -397,11 +536,16 @@ export const InteractiveGrid: React.FC = () => {
           {/* Cart Hold */}
           <div className="p-4 rounded-2xl bg-[#0b0f19] border border-white/[0.08] space-y-4 font-mono text-xs">
             <div className="flex justify-between items-center pb-2 border-b border-white/[0.08]">
-              <span className="font-bold text-white uppercase">
-                Keranjang Kursi ({selectedSeatIds.length}/2)
-              </span>
+              <div>
+                <span className="font-bold text-white uppercase block">
+                  Keranjang ({selectedSeatIds.length}/{config.maxSeatsPerUser})
+                </span>
+                <span className="text-[10px] text-cyan-400">
+                  Paket: {currentQuote?.package || selectedPackage}
+                </span>
+              </div>
               {selectedSeatIds.length > 0 && (
-                <button onClick={clearSelection} className="text-rose-400 hover:underline font-bold">
+                <button onClick={clearSelection} className="text-rose-400 hover:underline font-bold text-[11px]">
                   Kosongkan
                 </button>
               )}
@@ -409,7 +553,7 @@ export const InteractiveGrid: React.FC = () => {
 
             {selectedSeatIds.length === 0 ? (
               <p className="text-slate-400 italic py-4 text-center">
-                Klik kursi berwarna hijau (Kosong) untuk memilih maksimal 2 kursi.
+                Pilih kategori & paket di atas, lalu klik kursi hijau (Kosong).
               </p>
             ) : (
               <div className="space-y-3">
@@ -443,14 +587,42 @@ export const InteractiveGrid: React.FC = () => {
                       <span className="text-white font-semibold">
                         {s.id} ({s.tier})
                       </span>
-                      <span className="text-emerald-400 font-bold">{formatRupiah(s.price)}</span>
+                      <span className="text-slate-300 font-bold">{formatRupiah(s.price)}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="pt-2 border-t border-white/[0.08] flex justify-between font-extrabold text-white">
-                  <span>Subtotal:</span>
-                  <span className="text-emerald-400">{formatRupiah(subtotal)}</span>
+                {/* Live Discount Calculation */}
+                {currentQuote && currentQuote.totalSavings > 0 && (
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-1 text-[11px]">
+                    <div className="flex justify-between">
+                      <span>Harga Normal:</span>
+                      <span className="line-through text-slate-500">{formatRupiah(currentQuote.subtotalNormal)}</span>
+                    </div>
+                    {currentQuote.categoryDiscountTotal > 0 && (
+                      <div className="flex justify-between">
+                        <span>Diskon Kategori:</span>
+                        <span>-{formatRupiah(currentQuote.categoryDiscountTotal)}</span>
+                      </div>
+                    )}
+                    {currentQuote.packageDiscountTotal > 0 && (
+                      <div className="flex justify-between">
+                        <span>Diskon Paket ({currentQuote.packageDiscountPercent}%):</span>
+                        <span>-{formatRupiah(currentQuote.packageDiscountTotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold pt-1 border-t border-emerald-500/20 text-white">
+                      <span>Total Hemat:</span>
+                      <span className="text-emerald-300 font-extrabold">Hemat {formatRupiah(currentQuote.totalSavings)}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-white/[0.08] flex justify-between font-extrabold text-white text-sm">
+                  <span>Total Tagihan:</span>
+                  <span className="text-emerald-400">
+                    {formatRupiah(currentQuote ? currentQuote.grandTotal : subtotal + (selectedSeatIds.length * 5000))}
+                  </span>
                 </div>
 
                 <button

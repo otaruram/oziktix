@@ -6,6 +6,7 @@ import { checkoutRouter, ticketRouter } from './interfaces/http/routes/checkout.
 import { gateRouter } from './interfaces/http/routes/gate.routes';
 import { adminRouter } from './interfaces/http/routes/admin.routes';
 import { userRouter } from './interfaces/http/routes/user.routes';
+import { pricingRouter, adminPricingRouter } from './interfaces/http/controllers/pricing.controller';
 import { errorMiddleware } from './interfaces/http/middlewares/error.middleware';
 import { KeepAliveService } from './services/keepAlive.service';
 
@@ -53,6 +54,8 @@ app.use('/api/v1/seats', seatRouter);
 app.use('/api/v1/checkout', checkoutRouter);
 app.use('/api/v1/tickets', ticketRouter);
 app.use('/api/v1/gate', gateRouter);
+app.use('/api/v1/pricing', pricingRouter);
+app.use('/api/v1/admin/pricing', adminPricingRouter);
 app.use('/api/v1/admin', adminRouter);
 
 // Global Error Middleware

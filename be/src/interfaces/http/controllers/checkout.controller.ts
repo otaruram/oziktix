@@ -5,7 +5,7 @@ import { BadRequestError } from '../../../domain/errors';
 export class CheckoutController {
   public async confirm(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { seatId, seatIds, attendeePhone } = req.body;
+      const { seatId, seatIds, attendeePhone, packageType } = req.body;
       const targets: string[] = Array.isArray(seatIds) && seatIds.length > 0
         ? seatIds
         : seatId
@@ -19,11 +19,12 @@ export class CheckoutController {
         throw new BadRequestError('Unauthenticated user.');
       }
 
-      const issuedTickets = [];
-      for (const sId of targets) {
-        const ticket = await checkoutService.confirmCheckout(sId, attendeePhone, req.user);
-        issuedTickets.push(ticket);
-      }
+      const { tickets: issuedTickets, quote, orderId } = await checkoutService.confirmOrder(
+        targets,
+        attendeePhone,
+        req.user,
+        typeof packageType === 'string' ? packageType : undefined
+      );
 
       res.status(201).json({
         success: true,
@@ -31,6 +32,8 @@ export class CheckoutController {
         data: issuedTickets[0],
         ticket: issuedTickets[0],
         tickets: issuedTickets,
+        quote,
+        orderId,
       });
     } catch (e) {
       next(e);

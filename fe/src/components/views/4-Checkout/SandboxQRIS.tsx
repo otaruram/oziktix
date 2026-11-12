@@ -33,7 +33,7 @@ export const SandboxQRIS: React.FC = () => {
       <div className="py-12 px-6 rounded-3xl bg-[#0b0f19] border border-white/[0.1] text-center space-y-4">
         <h3 className="text-lg font-bold text-white font-mono">Belum Ada Kursi yang Dipilih</h3>
         <p className="text-xs text-slate-400">
-          Silakan pilih 1 atau 2 kursi terlebih dahulu pada denah Seat Map untuk memulai sesi pembayaran.
+          Silakan pilih paket dan kursi terlebih dahulu pada denah Seat Map untuk memulai sesi pembayaran.
         </p>
         <button
           onClick={() => setActiveTab('seatmap')}
