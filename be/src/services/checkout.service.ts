@@ -66,6 +66,18 @@ export class CheckoutService {
     const quote = computeQuote(config, category, pkg.code);
     const orderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
+    // Cumulative quota check: total active tickets + new purchase cannot exceed MAX_SEATS_PER_ORDER (Anti-Calo)
+    const existingActiveTickets = await prisma.$queryRaw<any[]>`
+      SELECT "id" FROM "Ticket"
+      WHERE "userId" = ${user.id}
+        AND "status" IN ('VALID'::"TicketStatus", 'CHECKED_IN'::"TicketStatus");
+    `;
+    if (existingActiveTickets.length + uniqueSeatIds.length > MAX_SEATS_PER_ORDER) {
+      throw new BadRequestError(
+        `Batas kuota maksimal ${MAX_SEATS_PER_ORDER} kursi per akun. Anda sudah memiliki ${existingActiveTickets.length} tiket aktif dan mencoba membeli ${uniqueSeatIds.length} tiket lagi. Sesuai regulasi anti-calo Summarecon Mall Bandung, silakan gunakan tiket yang sudah dimiliki.`
+      );
+    }
+
     // All-or-nothing pre-check: never issue a partial package if one seat is already owned
     const alreadyOwned = await prisma.$queryRaw<any[]>`
       SELECT "seatId" FROM "Ticket"

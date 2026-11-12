@@ -26,6 +26,9 @@ import {
   Tag,
   Sparkles,
   Users,
+  ShieldCheck,
+  Ticket as TicketIcon,
+  RotateCw,
 } from 'lucide-react';
 
 export const InteractiveGrid: React.FC = () => {
@@ -76,7 +79,9 @@ export const InteractiveGrid: React.FC = () => {
       ).length
     : 0;
 
-  const isQuotaFull = selectedSeatIds.length >= config.maxSeatsPerUser;
+  const hasMaxQuota = userOwnedCount >= config.maxSeatsPerUser;
+  const remainingQuota = Math.max(0, config.maxSeatsPerUser - userOwnedCount);
+  const isQuotaFull = selectedSeatIds.length >= remainingQuota;
 
   const selectedSeatsData = seats.filter((s) => selectedSeatIds.includes(s.id));
   const subtotal = selectedSeatsData.reduce((acc, s) => acc + s.price, 0);
@@ -134,11 +139,24 @@ export const InteractiveGrid: React.FC = () => {
       return;
     }
 
+    if (hasMaxQuota) {
+      addToast(
+        'warning',
+        `Batas Kuota ${config.maxSeatsPerUser} Kursi Tercapai`,
+        `Anda sudah memiliki ${userOwnedCount} tiket aktif (maksimal ${config.maxSeatsPerUser} tiket per akun). Sesuai kebijakan anti-calo Summarecon Mall Bandung, silakan gunakan tiket Anda di tab Tiket Pass.`
+      );
+      return;
+    }
+
     if (isQuotaFull) {
       addToast(
         'warning',
-        `Maksimal ${config.maxSeatsPerUser} Kursi Dipilih`,
-        `Anda sudah memilih ${selectedSeatIds.length} kursi (${selectedSeatIds.join(', ')}). Klik kursi yang dipilih jika ingin mengganti, atau langsung klik Lanjut ke Pembayaran!`
+        userOwnedCount > 0
+          ? `Sisa Kuota: ${remainingQuota} Kursi`
+          : `Maksimal ${config.maxSeatsPerUser} Kursi Dipilih`,
+        userOwnedCount > 0
+          ? `Anda sudah memiliki ${userOwnedCount} tiket aktif dan memilih ${selectedSeatIds.length} kursi. Batas kuota akun Anda adalah ${config.maxSeatsPerUser} tiket.`
+          : `Anda sudah memilih ${selectedSeatIds.length} kursi (${selectedSeatIds.join(', ')}). Klik kursi yang dipilih jika ingin mengganti, atau langsung klik Lanjut ke Pembayaran!`
       );
       return;
     }
@@ -210,6 +228,49 @@ export const InteractiveGrid: React.FC = () => {
           <Concurrency409Test />
         </div>
       </div>
+
+      {/* Maximum 3 Seats Quota Reached Banner (Anti-Scalper Policy) */}
+      {hasMaxQuota && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-amber-200 text-xs space-y-3 font-mono">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="text-white font-extrabold text-sm uppercase flex items-center gap-2">
+                <span>Batas Kuota Maksimal Tercapai ({userOwnedCount} / {config.maxSeatsPerUser} Kursi Dimiliki)</span>
+                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/30">
+                  ANTI-CALO
+                </span>
+              </div>
+              <p className="text-slate-300 leading-relaxed font-sans text-xs">
+                Sesuai kebijakan resmi anti-calo Summarecon Mall Bandung, 1 akun Google terverifikasi NIK dibatasi maksimal {config.maxSeatsPerUser} tiket. Anda telah memiliki {userOwnedCount} tiket aktif dan tidak dapat membeli kursi tambahan.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5 pt-1 font-sans">
+            <button
+              onClick={() => setActiveTab('tickets')}
+              className="px-4 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs flex items-center gap-2 transition-all shadow-md active:scale-95"
+            >
+              <TicketIcon className="w-4 h-4" />
+              <span>Buka E-Tiket Saya (Digital Pass TOTP 30s)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('tickets')}
+              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-white/[0.15] font-semibold text-xs flex items-center gap-2 transition-all"
+            >
+              <RotateCw className="w-3.5 h-3.5 text-purple-400" />
+              <span>Tukar Kursi (1x Free Seat Swap)</span>
+            </button>
+            <button
+              onClick={handleRestartFromZero}
+              disabled={isRestarting}
+              className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono text-[11px] transition-colors ml-auto"
+            >
+              {isRestarting ? 'Mereset...' : 'Reset Playground Demo'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Quota Alert Banner */}
       {quotaWarning && (
@@ -339,19 +400,32 @@ export const InteractiveGrid: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             {pricingConfig.packages.map((pkg) => {
               const isSelected = selectedPackage === pkg.code;
+              const isExceedingQuota = pkg.seats > remainingQuota;
               return (
                 <button
                   key={pkg.code}
                   type="button"
+                  disabled={isExceedingQuota}
                   onClick={() => setSelectedPackage(pkg.code)}
+                  title={
+                    isExceedingQuota
+                      ? `Melebihi sisa kuota Anda (${remainingQuota} kursi lagi)`
+                      : undefined
+                  }
                   className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                    isSelected
+                    isExceedingQuota
+                      ? 'opacity-40 cursor-not-allowed bg-slate-950 text-slate-500 border border-white/[0.05]'
+                      : isSelected
                       ? 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/20 font-extrabold'
                       : 'bg-slate-950 text-slate-300 border border-white/[0.1] hover:text-white'
                   }`}
                 >
                   <span>{pkg.name}</span>
-                  {pkg.discountPercent > 0 && (
+                  {isExceedingQuota ? (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300">
+                      Sisa Kuota: {remainingQuota}
+                    </span>
+                  ) : pkg.discountPercent > 0 ? (
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded font-extrabold ${
                         isSelected ? 'bg-slate-950 text-cyan-300' : 'bg-emerald-500/20 text-emerald-400'
@@ -359,7 +433,7 @@ export const InteractiveGrid: React.FC = () => {
                     >
                       Hemat {pkg.discountPercent}%
                     </span>
-                  )}
+                  ) : null}
                 </button>
               );
             })}

@@ -607,10 +607,27 @@ export const TicketingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return { success: false, error: msg };
       }
 
-      if (selectedSeatIds.length >= config.maxSeatsPerUser && !selectedSeatIds.includes(seatId)) {
-        const msg = `Batas Maksimal ${config.maxSeatsPerUser} Kursi per Transaksi: Anda sudah memilih ${selectedSeatIds.length} kursi (${selectedSeatIds.join(', ')}). Klik tombol "Lanjut ke Halaman Pembayaran" atau batalkan salah satu kursi terlebih dahulu.`;
+      // Cumulative Quota Validation (Anti-Calo: Max 3 seats per Google Account)
+      const userActiveTicketsCount = tickets.filter(
+        (t) => t.userId === currentUser.id && (t.status === 'ACTIVE' || t.status === 'USED')
+      ).length;
+
+      if (userActiveTicketsCount >= config.maxSeatsPerUser) {
+        const msg = `Batas Kuota ${config.maxSeatsPerUser} Kursi Tercapai: Anda sudah memiliki ${userActiveTicketsCount} tiket aktif. Sesuai kebijakan anti-calo Summarecon Mall Bandung, 1 akun maksimal memiliki ${config.maxSeatsPerUser} tiket. Silakan gunakan tiket Anda di tab Tiket Pass.`;
         setQuotaWarning(msg);
-        addToast('warning', `Maksimal ${config.maxSeatsPerUser} Kursi Dipilih`, msg);
+        addToast('warning', 'Batas Kuota Maksimal Tercapai', msg);
+        return { success: false, error: msg };
+      }
+
+      const remainingSelectableQuota = Math.max(0, config.maxSeatsPerUser - userActiveTicketsCount);
+
+      if (selectedSeatIds.length >= remainingSelectableQuota && !selectedSeatIds.includes(seatId)) {
+        const msg =
+          userActiveTicketsCount > 0
+            ? `Batas Kuota Maksimal ${config.maxSeatsPerUser} Kursi: Anda sudah memiliki ${userActiveTicketsCount} tiket aktif dan memilih ${selectedSeatIds.length} kursi. Sisa kuota pesanan Anda adalah ${remainingSelectableQuota} kursi.`
+            : `Batas Maksimal ${config.maxSeatsPerUser} Kursi per Transaksi: Anda sudah memilih ${selectedSeatIds.length} kursi (${selectedSeatIds.join(', ')}). Klik tombol "Lanjut ke Halaman Pembayaran" atau batalkan salah satu kursi terlebih dahulu.`;
+        setQuotaWarning(msg);
+        addToast('warning', 'Batas Kuota Tercapai', msg);
         return { success: false, error: msg };
       }
 

@@ -166,3 +166,4 @@ export function formatRupiah(val: number): string {
     maximumFractionDigits: 0,
   }).format(val);
 }
+

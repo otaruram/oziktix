@@ -238,7 +238,7 @@ export class SeatService {
       throw new NotFoundError(`Kursi ${seatId} tidak ditemukan di denah venue.`);
     }
 
-    const [existingTickets, existingHolds] = await Promise.all([
+    const [existingTicketsOnSeat, allUserActiveTickets, existingHolds] = await Promise.all([
       prisma.$queryRaw<any[]>`
         SELECT "id" FROM "Ticket"
         WHERE "userId" = ${user.id}
@@ -247,14 +247,25 @@ export class SeatService {
         LIMIT 1;
       `,
       prisma.$queryRaw<any[]>`
+        SELECT "id", "seatId" FROM "Ticket"
+        WHERE "userId" = ${user.id}
+          AND "status" IN ('VALID'::"TicketStatus", 'CHECKED_IN'::"TicketStatus");
+      `,
+      prisma.$queryRaw<any[]>`
         SELECT * FROM "UserSeatHold"
         WHERE "userId" = ${user.id}
           AND "expiresAt" > NOW();
       `,
     ]);
 
-    if (existingTickets.length > 0) {
+    if (existingTicketsOnSeat.length > 0) {
       throw new ConflictError(`Kursi ${seatId} sudah penuh / telah Anda beli.`);
+    }
+
+    if (allUserActiveTickets.length >= MAX_SEATS_PER_ORDER) {
+      throw new QuotaExceededError(
+        `Batas kuota maksimal ${MAX_SEATS_PER_ORDER} kursi per akun telah tercapai (Anda sudah memiliki ${allUserActiveTickets.length} tiket aktif). Sesuai kebijakan anti-calo, silakan gunakan tiket Anda di tab Tiket Pass.`
+      );
     }
 
     const holdOnTarget = existingHolds.find((h) => h.seatId === seatId);
@@ -286,12 +297,12 @@ export class SeatService {
       throw new ConflictError(`HTTP 409 Conflict: Kursi ${seatId} sedang di-booking sementara oleh pembeli lain!`);
     }
 
-    // Count user's own active holds (excluding simulated competing hold and target seat itself)
-    // Max 3 = ukuran paket terbesar (Group)
+    // Count user's own active holds + existing tickets
+    // Total maximum 3 kursi per akun (Anti-Calo Summarecon Mall Bandung)
     const myOwnOtherHolds = existingHolds.filter((h) => !h.isSimulatedOther && h.seatId !== seatId);
-    if (myOwnOtherHolds.length >= MAX_SEATS_PER_ORDER) {
+    if (allUserActiveTickets.length + myOwnOtherHolds.length >= MAX_SEATS_PER_ORDER) {
       throw new QuotaExceededError(
-        `Maksimal ${MAX_SEATS_PER_ORDER} kursi per transaksi (paket Group). Anda sudah memilih ${myOwnOtherHolds.length} kursi.`
+        `Batas kuota maksimal ${MAX_SEATS_PER_ORDER} kursi per akun. Anda sudah memiliki ${allUserActiveTickets.length} tiket aktif dan memilih ${myOwnOtherHolds.length} kursi. Sesuai kebijakan anti-calo, silakan gunakan tiket Anda di tab Tiket Pass.`
       );
     }
 
